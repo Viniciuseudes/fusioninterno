@@ -1,32 +1,50 @@
-"use client"
+"use client";
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Table2, LayoutGrid, Calendar, ChevronDown, Search, Filter, UserPlus } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { UserSwitcher } from "@/components/user-switcher"
-import { useUser } from "@/contexts/user-context"
-import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Table2,
+  LayoutGrid,
+  Calendar,
+  ChevronDown,
+  Search,
+  Filter,
+  UserPlus,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useUser } from "@/contexts/user-context";
+import { Badge } from "@/components/ui/badge";
 
 interface DashboardHeaderProps {
-  projectName: string
-  viewMode: "table" | "kanban" | "calendar"
-  onViewModeChange: (mode: "table" | "kanban" | "calendar") => void
+  projectName: string;
+  viewMode: "table" | "kanban" | "calendar";
+  onViewModeChange: (mode: "table" | "kanban" | "calendar") => void;
 }
 
-export function DashboardHeader({ projectName, viewMode, onViewModeChange }: DashboardHeaderProps) {
-  const { isGestor } = useUser()
+export function DashboardHeader({
+  projectName,
+  viewMode,
+  onViewModeChange,
+}: DashboardHeaderProps) {
+  const { isGestor } = useUser();
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Badge variant={isGestor ? "default" : "secondary"} className={isGestor ? "bg-primary" : ""}>
+          <Badge
+            variant={isGestor ? "default" : "secondary"}
+            className={isGestor ? "bg-primary" : ""}
+          >
             {isGestor ? "Visão Completa" : "Visão do Setor"}
           </Badge>
         </div>
-        <UserSwitcher />
       </div>
 
       {/* Breadcrumbs & Title */}
@@ -70,7 +88,10 @@ export function DashboardHeader({ projectName, viewMode, onViewModeChange }: Das
             <Button
               variant="ghost"
               size="sm"
-              className={cn("px-3", viewMode === "table" && "bg-background shadow-sm")}
+              className={cn(
+                "px-3",
+                viewMode === "table" && "bg-background shadow-sm"
+              )}
               onClick={() => onViewModeChange("table")}
             >
               <Table2 className="h-4 w-4 mr-2" />
@@ -79,7 +100,10 @@ export function DashboardHeader({ projectName, viewMode, onViewModeChange }: Das
             <Button
               variant="ghost"
               size="sm"
-              className={cn("px-3", viewMode === "kanban" && "bg-background shadow-sm")}
+              className={cn(
+                "px-3",
+                viewMode === "kanban" && "bg-background shadow-sm"
+              )}
               onClick={() => onViewModeChange("kanban")}
             >
               <LayoutGrid className="h-4 w-4 mr-2" />
@@ -88,7 +112,10 @@ export function DashboardHeader({ projectName, viewMode, onViewModeChange }: Das
             <Button
               variant="ghost"
               size="sm"
-              className={cn("px-3", viewMode === "calendar" && "bg-background shadow-sm")}
+              className={cn(
+                "px-3",
+                viewMode === "calendar" && "bg-background shadow-sm"
+              )}
               onClick={() => onViewModeChange("calendar")}
             >
               <Calendar className="h-4 w-4 mr-2" />
@@ -109,5 +136,5 @@ export function DashboardHeader({ projectName, viewMode, onViewModeChange }: Das
         </div>
       </div>
     </div>
-  )
+  );
 }

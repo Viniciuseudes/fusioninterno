@@ -5,7 +5,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// --- USERS & TASKS ---
 export interface User {
   id: string
   name: string
@@ -80,7 +79,7 @@ export interface Team {
   projectCount: number
 }
 
-// --- ROOMS (ATUALIZADO) ---
+// --- ROOMS ---
 
 export type RoomModality = "hourly" | "shift" | "fixed"
 export type RoomSpecialty =
@@ -93,15 +92,7 @@ export type RoomSpecialty =
   | "odontologia"
   | "fonoaudiologia"
 
-export interface RoomHost {
-  id: string
-  name: string
-  avatar: string
-  phone: string
-  whatsapp: string
-}
-
-export interface RoomManager {
+export interface RoomContactInfo {
   name: string
   phone: string
 }
@@ -112,6 +103,7 @@ export interface Room {
   images: string[]
   neighborhood: string
   address: string
+  referencePoint: string // Novo campo
   modalities: RoomModality[]
   specialties: RoomSpecialty[]
   pricePerHour?: number
@@ -121,13 +113,11 @@ export interface Room {
   equipment: string[]
   nightShiftAvailable: boolean
   weekendAvailable: boolean
-  host: RoomHost
-  manager: RoomManager // Novo campo
+  host: RoomContactInfo // Atualizado
+  manager: RoomContactInfo // Novo campo
   description: string
   size: number
 }
-
-// --- MOCKS & LABELS ---
 
 export const specialtyLabels: Record<RoomSpecialty, string> = {
   psicologia: "Psicologia",
@@ -146,18 +136,6 @@ export const modalityLabels: Record<RoomModality, string> = {
   fixed: "Fixo Mensal",
 }
 
-// Lista base (agora o sistema busca do banco, mas mantemos como fallback)
-export const neighborhoods = [
-  "Todos",
-  "Jardins",
-  "Moema",
-  "Vila Nova Conceição",
-  "Pinheiros",
-  "Paulista",
-  "Itaim Bibi",
-  "Brooklin",
-]
-
 export const amenityLabels: Record<string, string> = {
   "ar-condicionado": "Ar Condicionado",
   wifi: "Wi-Fi",
@@ -168,12 +146,9 @@ export const amenityLabels: Record<string, string> = {
   vestiario: "Vestiário",
 }
 
-// Mock users e tasks omitidos para brevidade, mantenha os que já existem no seu arquivo se precisar deles para fallback.
-// Mas para o CRUD funcionar, as interfaces acima são as obrigatórias.
 export const sampleProject = { name: "Fusion Interno", tasks: [] }
 export const sampleTasks: Task[] = [] 
 
-// Funções Helpers
 export function getFilteredTasks(tasks: Task[], user: User | null): Task[] {
   if (!user) return []
   if (user.role === "gestor") return tasks

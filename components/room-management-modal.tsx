@@ -9,6 +9,8 @@ import {
   Ruler,
   MapPin,
   List,
+  User,
+  Phone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,28 +39,30 @@ export function RoomManagementModal({
   onClose,
   onSave,
 }: RoomManagementModalProps) {
-  // Estados do Formulário
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
   const [address, setAddress] = useState("");
-  const [size, setSize] = useState<string>(""); // String para facilitar input vazio
+  const [referencePoint, setReferencePoint] = useState("");
+  const [size, setSize] = useState<string>("");
 
-  // Listas
+  const [hostName, setHostName] = useState("");
+  const [hostPhone, setHostPhone] = useState("");
+  const [managerName, setManagerName] = useState("");
+  const [managerPhone, setManagerPhone] = useState("");
+  const [sameAsHost, setSameAsHost] = useState(false);
+
   const [images, setImages] = useState<string[]>([]);
   const [selectedModalities, setSelectedModalities] = useState<string[]>([]);
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
 
-  // Equipamentos como texto para edição rápida
   const [equipmentText, setEquipmentText] = useState("");
 
-  // Preços (Strings para permitir limpar o campo)
   const [priceHour, setPriceHour] = useState("");
   const [priceShift, setPriceShift] = useState("");
   const [priceFixed, setPriceFixed] = useState("");
 
-  // Booleans
   const [nightShift, setNightShift] = useState(false);
   const [weekend, setWeekend] = useState(false);
 
@@ -66,26 +70,29 @@ export function RoomManagementModal({
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Carregar dados se for edição
   useEffect(() => {
     if (isOpen && roomToEdit) {
       setName(roomToEdit.name);
       setDescription(roomToEdit.description);
       setNeighborhood(roomToEdit.neighborhood);
       setAddress(roomToEdit.address);
+      setReferencePoint(roomToEdit.referencePoint || "");
       setSize(roomToEdit.size.toString());
       setImages(roomToEdit.images);
+
+      setHostName(roomToEdit.host.name);
+      setHostPhone(roomToEdit.host.phone);
+      setManagerName(roomToEdit.manager.name);
+      setManagerPhone(roomToEdit.manager.phone);
+
       setSelectedModalities(roomToEdit.modalities);
       setSelectedSpecialties(roomToEdit.specialties);
       setSelectedAmenities(roomToEdit.amenities);
-
-      // Converte array para texto separado por vírgula
       setEquipmentText(roomToEdit.equipment.join(", "));
 
       setPriceHour(roomToEdit.pricePerHour?.toString() || "");
       setPriceShift(roomToEdit.pricePerShift?.toString() || "");
       setPriceFixed(roomToEdit.priceFixed?.toString() || "");
-
       setNightShift(roomToEdit.nightShiftAvailable);
       setWeekend(roomToEdit.weekendAvailable);
     } else if (isOpen && !roomToEdit) {
@@ -93,12 +100,25 @@ export function RoomManagementModal({
     }
   }, [isOpen, roomToEdit]);
 
+  useEffect(() => {
+    if (sameAsHost) {
+      setManagerName(hostName);
+      setManagerPhone(hostPhone);
+    }
+  }, [sameAsHost, hostName, hostPhone]);
+
   const resetForm = () => {
     setName("");
     setDescription("");
     setNeighborhood("");
     setAddress("");
+    setReferencePoint("");
     setSize("");
+    setHostName("");
+    setHostPhone("");
+    setManagerName("");
+    setManagerPhone("");
+    setSameAsHost(false);
     setImages([]);
     setSelectedModalities([]);
     setSelectedSpecialties([]);
@@ -114,11 +134,9 @@ export function RoomManagementModal({
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-
     setIsUploading(true);
     try {
       const newUrls: string[] = [];
-      // Upload paralelo
       await Promise.all(
         Array.from(files).map(async (file) => {
           const url = await RoomService.uploadRoomImage(file);
@@ -127,7 +145,6 @@ export function RoomManagementModal({
       );
       setImages((prev) => [...prev, ...newUrls]);
     } catch (error) {
-      console.error("Erro no upload", error);
       alert("Erro ao enviar imagens");
     } finally {
       setIsUploading(false);
@@ -144,17 +161,13 @@ export function RoomManagementModal({
     setList: (l: string[]) => void,
     item: string
   ) => {
-    if (list.includes(item)) {
-      setList(list.filter((i) => i !== item));
-    } else {
-      setList([...list, item]);
-    }
+    if (list.includes(item)) setList(list.filter((i) => i !== item));
+    else setList([...list, item]);
   };
 
   const handleSubmit = async () => {
-    // 1. Validação
-    if (!name || !neighborhood) {
-      alert("Preencha os campos obrigatórios (Nome e Bairro).");
+    if (!name || !neighborhood || !hostName || !hostPhone) {
+      alert("Preencha os campos obrigatórios e dados do anfitrião.");
       return;
     }
 
@@ -165,23 +178,10 @@ export function RoomManagementModal({
 
     setIsSubmitting(true);
     try {
-      // 2. Processamento dos dados
       const equipmentArray = equipmentText
         .split(",")
         .map((item) => item.trim())
         .filter((item) => item.length > 0);
-
-      // Conversão segura de preços e números
-      const safePriceHour =
-        priceHour && !isNaN(Number(priceHour)) ? Number(priceHour) : undefined;
-      const safePriceShift =
-        priceShift && !isNaN(Number(priceShift))
-          ? Number(priceShift)
-          : undefined;
-      const safePriceFixed =
-        priceFixed && !isNaN(Number(priceFixed))
-          ? Number(priceFixed)
-          : undefined;
       const safeSize = size && !isNaN(Number(size)) ? Number(size) : 0;
 
       const roomData: Partial<Room> = {
@@ -189,39 +189,29 @@ export function RoomManagementModal({
         description,
         neighborhood,
         address,
+        referencePoint,
         size: safeSize,
         images,
         modalities: selectedModalities as any,
         specialties: selectedSpecialties as any,
         amenities: selectedAmenities,
         equipment: equipmentArray,
-        pricePerHour: safePriceHour,
-        pricePerShift: safePriceShift,
-        priceFixed: safePriceFixed,
+        pricePerHour: priceHour ? Number(priceHour) : undefined,
+        pricePerShift: priceShift ? Number(priceShift) : undefined,
+        priceFixed: priceFixed ? Number(priceFixed) : undefined,
         nightShiftAvailable: nightShift,
         weekendAvailable: weekend,
-        // Host fixo por enquanto (pode evoluir para pegar do usuário logado)
-        host: {
-          id: "sys",
-          name: "Fusion Clinic",
-          phone: "",
-          avatar: "",
-          whatsapp: "",
-        },
+        host: { name: hostName, phone: hostPhone },
+        manager: { name: managerName, phone: managerPhone },
       };
 
-      // 3. Chamada ao Serviço
-      if (roomToEdit) {
-        await RoomService.updateRoom(roomToEdit.id, roomData);
-      } else {
-        await RoomService.createRoom(roomData);
-      }
+      if (roomToEdit) await RoomService.updateRoom(roomToEdit.id, roomData);
+      else await RoomService.createRoom(roomData);
 
-      onSave(); // Atualiza a lista na tela pai
-      onClose(); // Fecha o modal
-    } catch (error: any) {
-      console.error("Erro ao salvar sala", error);
-      alert(`Erro ao salvar sala: ${error.message || "Tente novamente."}`);
+      onSave();
+      onClose();
+    } catch (error) {
+      alert("Erro ao salvar sala.");
     } finally {
       setIsSubmitting(false);
     }
@@ -231,15 +221,11 @@ export function RoomManagementModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Overlay Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-
-      {/* Container Modal */}
       <div className="relative bg-card w-full max-w-4xl max-h-[90vh] rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-        {/* Header Fixo */}
         <div className="flex items-center justify-between p-6 border-b shrink-0 bg-card z-10">
           <h2 className="text-2xl font-bold">
             {roomToEdit ? "Editar Sala" : "Cadastrar Nova Sala"}
@@ -249,10 +235,8 @@ export function RoomManagementModal({
           </Button>
         </div>
 
-        {/* Corpo com Scroll */}
         <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
           <div className="space-y-8">
-            {/* 1. Informações Básicas */}
             <section className="space-y-4">
               <h3 className="text-lg font-semibold border-b pb-2 text-primary">
                 Informações Básicas
@@ -264,26 +248,6 @@ export function RoomManagementModal({
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Ex: Consultório Premium 01"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Localização (Bairro/Cidade) *</Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      className="pl-9"
-                      value={neighborhood}
-                      onChange={(e) => setNeighborhood(e.target.value)}
-                      placeholder="Ex: Vila Nova Conceição - SP"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label>Endereço Completo</Label>
-                  <Input
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="Rua, Número, Complemento"
                   />
                 </div>
                 <div className="space-y-2">
@@ -309,7 +273,109 @@ export function RoomManagementModal({
               </div>
             </section>
 
-            {/* 2. Fotos */}
+            <section className="space-y-4">
+              <h3 className="text-lg font-semibold border-b pb-2 text-primary">
+                Localização
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Bairro *</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      className="pl-9"
+                      value={neighborhood}
+                      onChange={(e) => setNeighborhood(e.target.value)}
+                      placeholder="Bairro"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Endereço Completo</Label>
+                  <Input
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Rua e Número"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Melhor Ponto de Referência</Label>
+                  <Input
+                    value={referencePoint}
+                    onChange={(e) => setReferencePoint(e.target.value)}
+                    placeholder="Ex: Ao lado do Shopping X, Em frente à farmácia Y"
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-4">
+              <h3 className="text-lg font-semibold border-b pb-2 text-primary">
+                Contatos
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Anfitrião */}
+                <div className="space-y-3 p-4 bg-muted/20 rounded-lg border">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <User className="h-4 w-4" /> Anfitrião (Dono)
+                  </h4>
+                  <div className="space-y-2">
+                    <Label>Nome</Label>
+                    <Input
+                      value={hostName}
+                      onChange={(e) => setHostName(e.target.value)}
+                      placeholder="Nome do anfitrião"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Telefone / WhatsApp</Label>
+                    <Input
+                      value={hostPhone}
+                      onChange={(e) => setHostPhone(e.target.value)}
+                      placeholder="(00) 00000-0000"
+                    />
+                  </div>
+                </div>
+
+                {/* Responsável */}
+                <div className="space-y-3 p-4 bg-muted/20 rounded-lg border">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <User className="h-4 w-4" /> Responsável Clínica
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="same"
+                        checked={sameAsHost}
+                        onCheckedChange={(c) => setSameAsHost(c as boolean)}
+                      />
+                      <label htmlFor="same" className="text-xs cursor-pointer">
+                        Mesmo do Anfitrião
+                      </label>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Nome</Label>
+                    <Input
+                      value={managerName}
+                      onChange={(e) => setManagerName(e.target.value)}
+                      disabled={sameAsHost}
+                      placeholder="Nome do responsável"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Telefone / WhatsApp</Label>
+                    <Input
+                      value={managerPhone}
+                      onChange={(e) => setManagerPhone(e.target.value)}
+                      disabled={sameAsHost}
+                      placeholder="(00) 00000-0000"
+                    />
+                  </div>
+                </div>
+              </div>
+            </section>
+
             <section className="space-y-4">
               <h3 className="text-lg font-semibold border-b pb-2 text-primary">
                 Galeria de Fotos *
@@ -318,7 +384,7 @@ export function RoomManagementModal({
                 {images.map((url, index) => (
                   <div
                     key={index}
-                    className="relative aspect-video rounded-lg overflow-hidden border group"
+                    className="relative aspect-[3/4] rounded-lg overflow-hidden border group"
                   >
                     <img
                       src={url}
@@ -333,9 +399,8 @@ export function RoomManagementModal({
                     </button>
                   </div>
                 ))}
-
                 <div
-                  className="aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="aspect-[3/4] border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors"
                   onClick={() => fileInputRef.current?.click()}
                 >
                   {isUploading ? (
@@ -344,7 +409,7 @@ export function RoomManagementModal({
                     <>
                       <Upload className="h-6 w-6 text-muted-foreground mb-1" />
                       <span className="text-xs text-muted-foreground text-center px-2">
-                        Adicionar Fotos
+                        Adicionar Fotos (Vertical)
                       </span>
                     </>
                   )}
@@ -360,14 +425,12 @@ export function RoomManagementModal({
               </div>
             </section>
 
-            {/* 3. Classificações */}
             <section className="space-y-4">
               <h3 className="text-lg font-semibold border-b pb-2 text-primary">
-                Classificação
+                Classificação & Infra
               </h3>
-
               <div className="space-y-2">
-                <Label>Modalidades Aceitas</Label>
+                <Label>Modalidades</Label>
                 <div className="flex flex-wrap gap-2">
                   {Object.keys(modalityLabels).map((key) => (
                     <Badge
@@ -384,14 +447,13 @@ export function RoomManagementModal({
                         )
                       }
                     >
-                      {modalityLabels[key as any]}
+                      {modalityLabels[key as keyof typeof modalityLabels]}
                     </Badge>
                   ))}
                 </div>
               </div>
-
               <div className="space-y-2">
-                <Label>Especialidades Atendidas</Label>
+                <Label>Especialidades</Label>
                 <div className="flex flex-wrap gap-2">
                   {Object.keys(specialtyLabels).map((key) => (
                     <Badge
@@ -410,67 +472,25 @@ export function RoomManagementModal({
                         )
                       }
                     >
-                      {specialtyLabels[key as any]}
+                      {specialtyLabels[key as keyof typeof specialtyLabels]}
                     </Badge>
                   ))}
                 </div>
               </div>
-            </section>
-
-            {/* 4. Infraestrutura */}
-            <section className="space-y-4">
-              <h3 className="text-lg font-semibold border-b pb-2 text-primary">
-                Infraestrutura
-              </h3>
-
               <div className="space-y-2">
-                <Label>Comodidades Fixas</Label>
-                <div className="flex flex-wrap gap-2">
-                  {Object.keys(amenityLabels).map((key) => (
-                    <Badge
-                      key={key}
-                      variant={
-                        selectedAmenities.includes(key)
-                          ? "secondary"
-                          : "outline"
-                      }
-                      className="cursor-pointer"
-                      onClick={() =>
-                        toggleSelection(
-                          selectedAmenities,
-                          setSelectedAmenities,
-                          key
-                        )
-                      }
-                    >
-                      {amenityLabels[key]}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <List className="h-4 w-4" />
-                  Equipamentos (Digite separado por vírgula)
-                </Label>
+                <Label>Equipamentos</Label>
                 <Textarea
                   value={equipmentText}
                   onChange={(e) => setEquipmentText(e.target.value)}
-                  placeholder="Ex: Laser CO2, Maca Elétrica, Wi-Fi 5G, Estacionamento Valet..."
+                  placeholder="Digite separado por vírgula..."
                   rows={3}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Digite todos os equipamentos e diferenciais separados por
-                  vírgula.
-                </p>
               </div>
             </section>
 
-            {/* 5. Preços e Regras */}
             <section className="space-y-4">
               <h3 className="text-lg font-semibold border-b pb-2 text-primary">
-                Valores e Regras
+                Valores
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
@@ -482,7 +502,6 @@ export function RoomManagementModal({
                       className="pl-9"
                       value={priceHour}
                       onChange={(e) => setPriceHour(e.target.value)}
-                      placeholder="0.00"
                     />
                   </div>
                 </div>
@@ -495,12 +514,11 @@ export function RoomManagementModal({
                       className="pl-9"
                       value={priceShift}
                       onChange={(e) => setPriceShift(e.target.value)}
-                      placeholder="0.00"
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Preço Fixo Mensal</Label>
+                  <Label>Preço Fixo</Label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -508,12 +526,10 @@ export function RoomManagementModal({
                       className="pl-9"
                       value={priceFixed}
                       onChange={(e) => setPriceFixed(e.target.value)}
-                      placeholder="0.00"
                     />
                   </div>
                 </div>
               </div>
-
               <div className="flex gap-6 pt-2">
                 <div className="flex items-center space-x-2">
                   <Checkbox
@@ -521,11 +537,8 @@ export function RoomManagementModal({
                     checked={nightShift}
                     onCheckedChange={(c) => setNightShift(c as boolean)}
                   />
-                  <label
-                    htmlFor="night"
-                    className="text-sm font-medium cursor-pointer"
-                  >
-                    Disponível Turno da Noite
+                  <label htmlFor="night" className="text-sm cursor-pointer">
+                    Turno Noite
                   </label>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -534,11 +547,8 @@ export function RoomManagementModal({
                     checked={weekend}
                     onCheckedChange={(c) => setWeekend(c as boolean)}
                   />
-                  <label
-                    htmlFor="weekend"
-                    className="text-sm font-medium cursor-pointer"
-                  >
-                    Disponível Fim de Semana
+                  <label htmlFor="weekend" className="text-sm cursor-pointer">
+                    Fim de Semana
                   </label>
                 </div>
               </div>
@@ -546,7 +556,6 @@ export function RoomManagementModal({
           </div>
         </div>
 
-        {/* Footer Fixo */}
         <div className="p-6 border-t bg-muted/20 flex justify-end gap-3 shrink-0">
           <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
             Cancelar
@@ -556,10 +565,8 @@ export function RoomManagementModal({
             disabled={isSubmitting || isUploading}
             className="min-w-[150px]"
           >
-            {isSubmitting ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : null}
-            {roomToEdit ? "Salvar Alterações" : "Cadastrar Sala"}
+            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            {roomToEdit ? "Salvar" : "Cadastrar"}
           </Button>
         </div>
       </div>

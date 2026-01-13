@@ -28,7 +28,6 @@ import {
   type Room,
   type RoomModality,
   type RoomSpecialty,
-  neighborhoods,
   specialtyLabels,
   modalityLabels,
 } from "@/lib/data";
@@ -45,7 +44,7 @@ interface FilterComboboxProps {
   options: string[];
   value: string;
   onChange: (value: string) => void;
-  labels?: Record<string, string>; // Opcional: para mapear chaves em nomes bonitos (ex: specialties)
+  labels?: Record<string, string>;
 }
 
 function FilterCombobox({
@@ -59,7 +58,6 @@ function FilterCombobox({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  // Filtra as opções baseado no que o usuário digita
   const filteredOptions = useMemo(() => {
     if (!search) return options;
     return options.filter((item) => {
@@ -434,13 +432,14 @@ function RoomCard({
         </div>
       )}
 
-      <div className="aspect-[4/3] relative overflow-hidden bg-muted">
+      {/* ASPECT-RATIO 3/4 PARA FORMATO RETRATO (CELULAR) */}
+      <div className="aspect-[3/4] relative overflow-hidden bg-muted">
         <img
           src={room.images[0] || "/placeholder.jpg"}
           alt={room.name}
           className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-60" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-80" />
         <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
           {room.modalities.slice(0, 2).map((mod) => (
             <Badge
@@ -479,20 +478,24 @@ function RoomCard({
             </Badge>
           )}
         </div>
+
+        {/* EXIBIÇÃO INTELIGENTE: REFERÊNCIA OU EQUIPAMENTOS */}
         <div className="space-y-1.5 pt-1">
-          {room.equipment.slice(0, 2).map((item) => (
-            <div
-              key={item}
-              className="flex items-center gap-2 text-xs text-muted-foreground"
-            >
-              <Check className="h-3 w-3 text-green-500 shrink-0" />
-              <span className="truncate">{item}</span>
-            </div>
-          ))}
-          {room.equipment.length > 2 && (
-            <p className="text-[10px] text-muted-foreground pl-5">
-              + {room.equipment.length - 2} equipamentos
+          {room.referencePoint ? (
+            <p className="text-xs text-muted-foreground flex items-start gap-1">
+              <MapPin className="h-3 w-3 mt-0.5 shrink-0 text-primary" />
+              <span className="line-clamp-2">{room.referencePoint}</span>
             </p>
+          ) : (
+            room.equipment.slice(0, 2).map((item) => (
+              <div
+                key={item}
+                className="flex items-center gap-2 text-xs text-muted-foreground"
+              >
+                <Check className="h-3 w-3 text-green-500 shrink-0" />
+                <span className="truncate">{item}</span>
+              </div>
+            ))
           )}
         </div>
       </CardContent>

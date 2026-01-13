@@ -5,13 +5,13 @@ import { Room, modalityLabels, specialtyLabels } from "@/lib/data";
 import {
   X,
   MapPin,
-  Copy,
   Check,
   Users,
   Ruler,
   Moon,
   Sun,
   Calendar,
+  Share2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,34 +36,23 @@ export function RoomDetailModal({
   isOpen,
   onClose,
 }: RoomDetailModalProps) {
-  const [copied, setCopied] = useState(false);
-
   if (!isOpen || !room) return null;
 
-  const handleCopyToClipboard = () => {
-    // Formata um texto bonito para WhatsApp
+  const handleShareWhatsApp = () => {
+    // Gera o link público (ajuste o domínio quando for pra produção)
+    const baseUrl = window.location.origin;
+    const publicLink = `${baseUrl}/share/room/${room.id}`;
+
     const text = `
-🏥 *${room.name}*
-📍 ${room.neighborhood} - ${room.address}
+🏥 *Olha essa sala que encontrei no Fusion!*
+*${room.name}* em ${room.neighborhood}
 
-📏 Tamanho: ${room.size}m²
-✨ Ideal para: ${room.specialties.map((s) => specialtyLabels[s]).join(", ")}
-
-✅ *Destaques & Equipamentos:*
-${room.equipment.map((e) => `• ${e}`).join("\n")}
-${room.amenities.map((a) => `• ${a}`).join("\n")}
-
-💰 *Valores:*
-${room.pricePerHour ? `• Hora: R$ ${room.pricePerHour}` : ""}
-${room.pricePerShift ? `• Turno (4h): R$ ${room.pricePerShift}` : ""}
-${room.priceFixed ? `• Fixo Mensal: R$ ${room.priceFixed}` : ""}
-
-🔗 Agende agora pelo Fusion Clinic!
+📸 Veja as fotos e detalhes aqui:
+${publicLink}
 `.trim();
 
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const encodedText = encodeURIComponent(text);
+    window.open(`https://wa.me/?text=${encodedText}`, "_blank");
   };
 
   return (
@@ -72,8 +61,7 @@ ${room.priceFixed ? `• Fixo Mensal: R$ ${room.priceFixed}` : ""}
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-
-      <div className="relative bg-card w-full max-w-4xl h-[90vh] md:h-auto md:max-h-[90vh] rounded-xl shadow-2xl flex flex-col md:flex-row overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative bg-card w-full max-w-4xl h-[90vh] rounded-xl shadow-2xl flex flex-col md:flex-row overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         <Button
           variant="ghost"
           size="icon"
@@ -83,71 +71,46 @@ ${room.priceFixed ? `• Fixo Mensal: R$ ${room.priceFixed}` : ""}
           <X className="h-5 w-5" />
         </Button>
 
-        {/* Coluna Esquerda: Imagens */}
+        {/* Coluna Esquerda: Imagens Verticais */}
         <div className="w-full md:w-1/2 bg-black flex items-center justify-center relative">
-          {room.images.length > 0 ? (
-            <Carousel className="w-full h-full">
-              <CarouselContent>
-                {room.images.map((img, index) => (
-                  <CarouselItem key={index} className="h-[300px] md:h-[600px]">
-                    <div className="h-full w-full flex items-center justify-center">
-                      <img
-                        src={img}
-                        alt={`Foto ${index + 1}`}
-                        className="object-cover w-full h-full"
-                      />
-                    </div>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              {room.images.length > 1 && (
-                <>
-                  <CarouselPrevious className="left-4" />
-                  <CarouselNext className="right-4" />
-                </>
-              )}
-            </Carousel>
-          ) : (
-            <div className="text-white/50 flex flex-col items-center">
-              <Moon className="h-12 w-12 mb-2" />
-              <p>Sem fotos disponíveis</p>
-            </div>
-          )}
-
-          <div className="absolute bottom-4 left-4 flex gap-2">
-            {room.nightShiftAvailable && (
-              <Badge className="bg-indigo-600 hover:bg-indigo-700">
-                <Moon className="w-3 h-3 mr-1" /> Noite
-              </Badge>
+          <Carousel className="w-full h-full">
+            <CarouselContent>
+              {room.images.map((img, index) => (
+                <CarouselItem key={index} className="h-[40vh] md:h-full">
+                  <img
+                    src={img}
+                    alt={`Foto ${index + 1}`}
+                    className="object-cover w-full h-full"
+                  />
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+            {room.images.length > 1 && (
+              <>
+                <CarouselPrevious className="left-4" />
+                <CarouselNext className="right-4" />
+              </>
             )}
-            {room.weekendAvailable && (
-              <Badge className="bg-green-600 hover:bg-green-700">
-                <Sun className="w-3 h-3 mr-1" /> Fim de Semana
-              </Badge>
-            )}
-          </div>
+          </Carousel>
         </div>
 
         {/* Coluna Direita: Informações */}
         <div className="w-full md:w-1/2 flex flex-col bg-background">
           <ScrollArea className="flex-1 p-6 md:p-8">
             <div className="space-y-6">
-              {/* Cabeçalho */}
               <div>
-                <div className="flex items-start justify-between">
-                  <h2 className="text-2xl font-bold text-foreground">
-                    {room.name}
-                  </h2>
-                </div>
+                <h2 className="text-2xl font-bold text-foreground">
+                  {room.name}
+                </h2>
                 <p className="text-muted-foreground flex items-center gap-1 mt-1 text-sm">
                   <MapPin className="h-4 w-4 text-primary" /> {room.address},{" "}
                   {room.neighborhood}
                 </p>
-              </div>
-
-              {/* Descrição */}
-              <div className="text-sm leading-relaxed text-muted-foreground bg-muted/30 p-4 rounded-lg border">
-                {room.description || "Nenhuma descrição fornecida."}
+                {room.referencePoint && (
+                  <p className="text-xs text-muted-foreground mt-1 ml-5">
+                    Ref: {room.referencePoint}
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -157,13 +120,14 @@ ${room.priceFixed ? `• Fixo Mensal: R$ ${room.priceFixed}` : ""}
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Users className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">Capacidade Padrão</span>
+                  <span className="font-medium">
+                    Responsável: {room.manager.name}
+                  </span>
                 </div>
               </div>
 
               <Separator />
 
-              {/* Equipamentos e Comodidades */}
               <div className="space-y-3">
                 <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">
                   Infraestrutura
@@ -185,75 +149,42 @@ ${room.priceFixed ? `• Fixo Mensal: R$ ${room.priceFixed}` : ""}
                   ))}
                 </div>
               </div>
-
-              {/* Especialidades */}
-              <div className="space-y-3">
-                <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">
-                  Ideal Para
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {room.specialties.map((spec) => (
-                    <div
-                      key={spec}
-                      className="flex items-center gap-1 text-sm text-foreground bg-muted px-2 py-1 rounded-md"
-                    >
-                      <Check className="h-3 w-3 text-green-500" />{" "}
-                      {specialtyLabels[spec]}
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
           </ScrollArea>
 
-          {/* Footer Fixo: Preços e Ação */}
           <div className="p-6 border-t bg-muted/10 space-y-4">
             <div className="flex justify-between items-end">
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  Planos Disponíveis
-                </p>
-                <div className="flex gap-4 mt-1">
-                  {room.pricePerHour && (
-                    <div>
-                      <span className="block text-lg font-bold text-primary">
-                        R$ {room.pricePerHour}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        / hora
-                      </span>
-                    </div>
-                  )}
-                  {room.pricePerShift && (
-                    <div>
-                      <span className="block text-lg font-bold text-primary">
-                        R$ {room.pricePerShift}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        / turno
-                      </span>
-                    </div>
-                  )}
-                </div>
+              <div className="flex gap-4">
+                {room.pricePerHour && (
+                  <div>
+                    <span className="block text-lg font-bold text-primary">
+                      R$ {room.pricePerHour}
+                    </span>
+                    <span className="text-xs text-muted-foreground">/h</span>
+                  </div>
+                )}
+                {room.pricePerShift && (
+                  <div>
+                    <span className="block text-lg font-bold text-primary">
+                      R$ {room.pricePerShift}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      /turno
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <Button
                 variant="outline"
-                onClick={handleCopyToClipboard}
-                className="w-full"
+                onClick={handleShareWhatsApp}
+                className="w-full bg-green-50 hover:bg-green-100 hover:text-green-700 border-green-200"
               >
-                {copied ? (
-                  <Check className="h-4 w-4 mr-2" />
-                ) : (
-                  <Copy className="h-4 w-4 mr-2" />
-                )}
-                {copied ? "Copiado!" : "Copiar Info"}
+                <Share2 className="h-4 w-4 mr-2" /> Compartilhar
               </Button>
-              <Button className="w-full">
-                <Calendar className="h-4 w-4 mr-2" /> Reservar Sala
-              </Button>
+              <Button className="w-full">Reservar Sala</Button>
             </div>
           </div>
         </div>
