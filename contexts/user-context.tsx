@@ -29,9 +29,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    // Rotas públicas que não exigem login
+    // 1. Definição das rotas públicas
     const publicRoutes = ["/login", "/register", "/forgot-password"];
-    const isPublicRoute = publicRoutes.includes(pathname);
+
+    // 2. A MÁGICA ACONTECE AQUI:
+    // Verifica se está na lista exata OU se começa com "/share" (para as salas compartilhadas)
+    const isPublicRoute =
+      publicRoutes.includes(pathname) || pathname?.startsWith("/share");
 
     const fetchUser = async () => {
       try {
@@ -42,7 +46,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
         if (!session) {
           setCurrentUser(null);
           setIsLoading(false);
-          // Se não tem sessão e não está em rota pública, manda pro login
+
+          // Se NÃO tem sessão e NÃO está em rota pública, manda pro login
           if (!isPublicRoute) {
             router.push("/login");
           }
@@ -58,6 +63,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         if (error || !profile) {
           console.error("Erro ao buscar perfil:", error);
           setCurrentUser(null);
+          // Mesmo com erro, se for rota pública, deixa ficar
           if (!isPublicRoute) router.push("/login");
         } else {
           const adaptedUser: User = {
@@ -92,7 +98,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
       } else {
         setCurrentUser(null);
         setIsLoading(false);
-        if (!publicRoutes.includes(pathname)) {
+
+        // Recalcula se é rota pública dentro do evento de mudança de auth
+        const currentIsPublic =
+          publicRoutes.includes(pathname) || pathname?.startsWith("/share");
+
+        if (!currentIsPublic) {
           router.push("/login");
         }
       }
