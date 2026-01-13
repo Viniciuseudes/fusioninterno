@@ -1,147 +1,180 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { type InboxItem, sampleInboxItems, sampleTasks } from "@/lib/data"
-import { cn } from "@/lib/utils"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AtSign, UserPlus, MessageSquare, RefreshCw, Search, Check, Bell, BellOff } from "lucide-react"
-import { formatDistanceToNow } from "date-fns"
-import { ptBR } from "date-fns/locale"
-import type { Task } from "@/lib/data"
+import { useEffect, useState } from "react";
+import { type Task, type InboxItem } from "@/lib/data"; // Usamos a interface InboxItem
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Bell,
+  MessageSquare,
+  UserPlus,
+  CheckCircle2,
+  Clock,
+  Check,
+  Loader2,
+} from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { useUser } from "@/contexts/user-context";
+import { TaskService } from "@/services/task-service";
 
 interface InboxViewProps {
-  onTaskClick: (task: Task) => void
-}
-
-const typeConfig = {
-  mention: { icon: AtSign, label: "Menção", color: "text-primary" },
-  assignment: { icon: UserPlus, label: "Atribuição", color: "text-status-working" },
-  comment: { icon: MessageSquare, label: "Comentário", color: "text-status-pending" },
-  update: { icon: RefreshCw, label: "Atualização", color: "text-status-done" },
+  onTaskClick: (task: Task) => void;
 }
 
 export function InboxView({ onTaskClick }: InboxViewProps) {
-  const [inboxItems, setInboxItems] = useState<InboxItem[]>(sampleInboxItems)
-  const [filter, setFilter] = useState<"all" | "unread">("all")
+  const { currentUser } = useUser();
+  const [items, setItems] = useState<InboxItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const unreadCount = inboxItems.filter((item) => !item.read).length
-  const filteredItems = filter === "all" ? inboxItems : inboxItems.filter((item) => !item.read)
-
-  const markAsRead = (id: string) => {
-    setInboxItems((prev) => prev.map((item) => (item.id === id ? { ...item, read: true } : item)))
-  }
-
-  const markAllAsRead = () => {
-    setInboxItems((prev) => prev.map((item) => ({ ...item, read: true })))
-  }
-
-  const handleItemClick = (item: InboxItem) => {
-    markAsRead(item.id)
-    const task = sampleTasks.find((t) => t.id === item.taskId)
-    if (task) {
-      onTaskClick(task)
+  const fetchNotifications = async () => {
+    if (!currentUser) return;
+    setLoading(true);
+    try {
+      const data = await TaskService.getNotifications(currentUser.id);
+      setItems(data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [currentUser]);
+
+  const handleMarkAsRead = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await TaskService.markNotificationRead(id);
+    setItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, read: true } : item))
+    );
+  };
+
+  const handleMarkAllRead = async () => {
+    if (!currentUser) return;
+    await TaskService.markAllRead(currentUser.id);
+    setItems((prev) => prev.map((item) => ({ ...item, read: true })));
+  };
+
+  const unreadCount = items.filter((i) => !i.read).length;
+
+  const getIcon = (type: string) => {
+    switch (type) {
+      case "assignment":
+        return <UserPlus className="h-4 w-4 text-blue-500" />;
+      case "comment":
+        return <MessageSquare className="h-4 w-4 text-green-500" />;
+      case "mention":
+        return <Bell className="h-4 w-4 text-amber-500" />;
+      case "update":
+        return <CheckCircle2 className="h-4 w-4 text-purple-500" />;
+      default:
+        return <Clock className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="animate-spin text-primary h-8 w-8" />
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            Caixa de Entrada
-            {unreadCount > 0 && <Badge className="bg-primary text-primary-foreground">{unreadCount}</Badge>}
-          </h1>
-          <p className="text-muted-foreground">Acompanhe menções, atribuições e atualizações</p>
+    <div className="h-full flex flex-col space-y-4">
+      <div className="flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold">Caixa de Entrada</h1>
+          <Badge
+            variant="secondary"
+            className="bg-primary/10 text-primary hover:bg-primary/20"
+          >
+            {unreadCount} não lidas
+          </Badge>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar notificações..." className="pl-9" />
-          </div>
-          <Button variant="outline" onClick={markAllAsRead} disabled={unreadCount === 0}>
-            <Check className="h-4 w-4 mr-2" />
-            Marcar tudo como lido
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleMarkAllRead}
+          disabled={unreadCount === 0}
+        >
+          <Check className="h-4 w-4 mr-2" />
+          Marcar todas como lidas
+        </Button>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={filter} onValueChange={(v) => setFilter(v as "all" | "unread")}>
-        <TabsList>
-          <TabsTrigger value="all" className="flex items-center gap-2">
-            <Bell className="h-4 w-4" />
-            Todas
-          </TabsTrigger>
-          <TabsTrigger value="unread" className="flex items-center gap-2">
-            <BellOff className="h-4 w-4" />
-            Não lidas
-            {unreadCount > 0 && (
-              <Badge variant="secondary" className="ml-1">
-                {unreadCount}
-              </Badge>
-            )}
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value={filter} className="mt-4">
-          {filteredItems.length === 0 ? (
-            <div className="text-center py-12 bg-card rounded-lg border border-border">
-              <Bell className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="font-medium mb-1">
-                {filter === "unread" ? "Nenhuma notificação não lida" : "Caixa de entrada vazia"}
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {filter === "unread"
-                  ? "Você está em dia com todas as suas notificações!"
-                  : "Você receberá notificações aqui quando houver atividade."}
-              </p>
-            </div>
-          ) : (
-            <div className="bg-card rounded-lg border border-border divide-y divide-border">
-              {filteredItems.map((item) => {
-                const TypeIcon = typeConfig[item.type].icon
-                return (
-                  <div
-                    key={item.id}
-                    onClick={() => handleItemClick(item)}
-                    className={cn(
-                      "p-4 hover:bg-muted/30 cursor-pointer transition-colors flex items-start gap-4",
-                      !item.read && "bg-primary/5",
-                    )}
-                  >
-                    <Avatar className="h-10 w-10 shrink-0">
-                      <AvatarImage src={item.fromUser.avatar || "/placeholder.svg"} alt={item.fromUser.name} />
-                      <AvatarFallback>{item.fromUser.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <TypeIcon className={cn("h-4 w-4", typeConfig[item.type].color)} />
-                        <Badge variant="outline" className="text-xs">
-                          {typeConfig[item.type].label}
-                        </Badge>
-                        {!item.read && <div className="w-2 h-2 rounded-full bg-primary" />}
+      {items.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground border rounded-lg border-dashed">
+          <Bell className="h-10 w-10 mb-2 opacity-20" />
+          <p>Você não tem notificações.</p>
+        </div>
+      ) : (
+        <ScrollArea className="flex-1">
+          <div className="space-y-2 pr-4">
+            {items.map((item) => (
+              <Card
+                key={item.id}
+                className={`p-4 transition-all hover:shadow-md cursor-pointer group ${
+                  !item.read
+                    ? "bg-card border-l-4 border-l-primary"
+                    : "bg-muted/30 opacity-70"
+                }`}
+                onClick={async () => {
+                  if (!item.read) handleMarkAsRead(item.id, {} as any);
+                  // Busca a tarefa completa para abrir o modal
+                  // Nota: Num cenário ideal, teríamos getTaskById, mas aqui podemos tentar filtrar do contexto ou buscar
+                  // Por simplicidade, vamos só marcar como lido por enquanto.
+                  // Se quiser abrir o modal, precisaria implementar getTaskById no Service e chamar aqui.
+                }}
+              >
+                <div className="flex gap-4">
+                  <div className="mt-1">{getIcon(item.type)}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1">
+                        <p className="text-sm">
+                          <span className="font-semibold">
+                            {item.fromUser?.name || "Sistema"}
+                          </span>{" "}
+                          <span className="text-muted-foreground">
+                            {item.content}
+                          </span>{" "}
+                          <span className="font-medium text-foreground">
+                            {item.taskName}
+                          </span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(item.timestamp, {
+                            addSuffix: true,
+                            locale: ptBR,
+                          })}
+                        </p>
                       </div>
-                      <p className="text-sm">
-                        <span className="font-medium">{item.fromUser.name}</span>{" "}
-                        <span className="text-muted-foreground">{item.content}</span>
-                      </p>
-                      <p className="text-sm text-primary font-medium mt-1">{item.taskName}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {formatDistanceToNow(item.timestamp, { addSuffix: true, locale: ptBR })}
-                      </p>
+                      {!item.read && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => handleMarkAsRead(item.id, e)}
+                          title="Marcar como lida"
+                        >
+                          <div className="h-2 w-2 rounded-full bg-primary" />
+                        </Button>
+                      )}
                     </div>
                   </div>
-                )
-              })}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </ScrollArea>
+      )}
     </div>
-  )
+  );
 }
