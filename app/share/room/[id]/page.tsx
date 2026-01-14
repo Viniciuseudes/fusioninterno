@@ -1,7 +1,17 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { RoomService } from "@/services/room-service";
 import { Room, modalityLabels, specialtyLabels } from "@/lib/data";
-import { MapPin, Check, Ruler, Phone, Share2, Navigation } from "lucide-react";
+import {
+  Loader2,
+  MapPin,
+  Check,
+  Ruler,
+  Phone,
+  Share2,
+  Navigation,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,13 +24,51 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
-// Interface corrigida para receber o objeto Room completo
+// Interface restaurada para aceitar roomId (string)
 interface PublicRoomViewProps {
-  room: Room;
+  roomId: string;
 }
 
-export function PublicRoomView({ room }: PublicRoomViewProps) {
-  // Tratamento de segurança para o telefone
+export function PublicRoomView({ roomId }: PublicRoomViewProps) {
+  const [room, setRoom] = useState<Room | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      if (!roomId) return;
+      try {
+        // Tenta buscar por ID direto (mais eficiente)
+        const data = await RoomService.getRoomById(roomId);
+        setRoom(data);
+      } catch (error) {
+        console.error("Erro ao carregar sala:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [roomId]);
+
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <Loader2 className="animate-spin h-8 w-8 text-primary" />
+      </div>
+    );
+  }
+
+  if (!room) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-background text-muted-foreground gap-4">
+        <p>Sala não encontrada ou indisponível.</p>
+        <Button onClick={() => window.location.reload()}>
+          Tentar Novamente
+        </Button>
+      </div>
+    );
+  }
+
+  // Links do WhatsApp
   const cleanPhone = room.manager?.phone?.replace(/\D/g, "") || "";
   const whatsappLink = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(
     `Olá, vi a sala ${room.name} no Fusion e gostaria de mais informações.`
@@ -215,7 +263,7 @@ export function PublicRoomView({ room }: PublicRoomViewProps) {
               </h3>
 
               {/* Equipamentos */}
-              {room.equipment.length > 0 && (
+              {room.equipment && room.equipment.length > 0 && (
                 <div className="space-y-2">
                   <span className="text-xs font-semibold text-primary">
                     Equipamentos
@@ -235,7 +283,7 @@ export function PublicRoomView({ room }: PublicRoomViewProps) {
               )}
 
               {/* Comodidades */}
-              {room.amenities.length > 0 && (
+              {room.amenities && room.amenities.length > 0 && (
                 <div className="space-y-2 mt-4 pt-4 border-t">
                   <span className="text-xs font-semibold text-primary">
                     Comodidades
