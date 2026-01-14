@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge"; // Importado Badge
+import { Badge } from "@/components/ui/badge";
 import {
   Room,
   RoomModality,
@@ -42,24 +42,26 @@ import {
   amenityLabels,
   specialtyLabels,
 } from "@/lib/data";
-import { Loader2, Trash2, Upload, X } from "lucide-react"; // Importado X
+import { Loader2, Trash2, Upload, X } from "lucide-react";
 import { RoomService } from "@/services/room-service";
 import { toast } from "sonner";
 
 const DRAFT_KEY = "room-form-draft";
 
 const formSchema = z.object({
-  name: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
-  description: z.string().min(10, "Descrição deve ser mais detalhada"),
-  neighborhood: z.string().min(2, "Bairro obrigatório"),
-  address: z.string().min(5, "Endereço completo obrigatório"),
+  name: z.string().min(3, "Nome da sala é obrigatório (mín. 3 caracteres)"),
+  description: z.string().min(10, "Descrição muito curta (mín. 10 caracteres)"),
+  neighborhood: z.string().min(1, "Selecione um bairro"),
+  address: z.string().min(5, "Endereço completo é obrigatório"),
   referencePoint: z.string().optional(),
-  size: z.coerce.number().min(1, "Tamanho inválido"),
+  size: z.coerce.number().min(1, "Informe o tamanho da sala (m²)"),
 
-  modalities: z.array(z.string()).min(1, "Selecione pelo menos uma modalidade"),
+  modalities: z
+    .array(z.string())
+    .min(1, "Selecione pelo menos uma modalidade de aluguel"),
   specialties: z
     .array(z.string())
-    .min(1, "Selecione pelo menos uma especialidade"),
+    .min(1, "Selecione pelo menos uma especialidade aceita"),
   amenities: z.array(z.string()),
   equipment: z.array(z.string()),
 
@@ -70,16 +72,17 @@ const formSchema = z.object({
   nightShiftAvailable: z.boolean().default(false),
   weekendAvailable: z.boolean().default(false),
 
-  hostName: z.string().min(2, "Nome do anfitrião obrigatório"),
-  hostPhone: z.string().min(10, "Telefone inválido"),
+  hostName: z.string().min(2, "Nome do anfitrião é obrigatório"),
+  hostPhone: z.string().min(10, "Telefone do anfitrião inválido"),
 
-  managerName: z.string().min(2, "Nome do responsável obrigatório"),
-  managerPhone: z.string().min(10, "Telefone inválido"),
+  // Agora opcionais (se vazio, usa o do host)
+  managerName: z.string().optional(),
+  managerPhone: z.string().optional(),
 
   images: z.array(z.string()).optional(),
 });
 
-// Função utilitária para máscara de telefone
+// Máscara de telefone
 const formatPhone = (value: string) => {
   if (!value) return "";
   value = value.replace(/\D/g, "");
@@ -101,7 +104,8 @@ export function RoomManagementModal({
   roomToEdit,
   onSave,
 }: RoomManagementModalProps) {
-  const [equipmentInput, setEquipmentInput] = useState(""); // Estado local para o input de tags
+  const [equipmentInput, setEquipmentInput] = useState("");
+  const [activeTab, setActiveTab] = useState("basic"); // Estado para controlar a aba ativa
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -126,7 +130,7 @@ export function RoomManagementModal({
     },
   });
 
-  // 1. Carregar dados (Edição ou Rascunho)
+  // 1. Carregar dados
   useEffect(() => {
     if (isOpen) {
       if (roomToEdit) {
@@ -148,8 +152,8 @@ export function RoomManagementModal({
           weekendAvailable: roomToEdit.weekendAvailable,
           hostName: roomToEdit.host.name,
           hostPhone: roomToEdit.host.phone,
-          managerName: roomToEdit.manager?.name || roomToEdit.host.name,
-          managerPhone: roomToEdit.manager?.phone || roomToEdit.host.phone,
+          managerName: roomToEdit.manager?.name,
+          managerPhone: roomToEdit.manager?.phone,
           images: roomToEdit.images,
         });
       } else {
@@ -158,9 +162,9 @@ export function RoomManagementModal({
           try {
             const parsedDraft = JSON.parse(draft);
             form.reset(parsedDraft);
-            toast.info("Rascunho restaurado automaticamente.");
+            // toast.info("Rascunho restaurado."); // Comentado para não incomodar
           } catch (e) {
-            console.error("Erro ao restaurar rascunho", e);
+            console.error(e);
           }
         } else {
           form.reset({
@@ -197,24 +201,20 @@ export function RoomManagementModal({
     }
   }, [form.watch, roomToEdit, isOpen]);
 
-  // Lógica para adicionar Equipamento (Tag)
   const handleAddEquipment = (
     e: React.KeyboardEvent<HTMLInputElement> | React.MouseEvent
   ) => {
-    // Se for evento de teclado, só aceita Enter ou Vírgula
     if (
       (e as React.KeyboardEvent).key &&
       !["Enter", ","].includes((e as React.KeyboardEvent).key)
     ) {
       return;
     }
-
     e.preventDefault();
-    const trimmed = equipmentInput.trim().replace(/,$/, ""); // Remove vírgula final se houver
+    const trimmed = equipmentInput.trim().replace(/,$/, "");
 
     if (trimmed) {
       const current = form.getValues("equipment") || [];
-      // Evita duplicatas (case insensitive opcional, aqui case sensitive)
       if (!current.includes(trimmed)) {
         form.setValue("equipment", [...current, trimmed]);
         setEquipmentInput("");
@@ -232,17 +232,60 @@ export function RoomManagementModal({
     );
   };
 
+  // Função chamada se houver ERRO no formulário ao tentar salvar
+  const onInvalid = (errors: any) => {
+    console.error("Erros de validação:", errors);
+
+    // Mapeia os erros para mensagens amigáveis e muda a aba se necessário
+    const errorKeys = Object.keys(errors);
+    if (errorKeys.length > 0) {
+      // Prioriza erros da aba atual, se não, vai para a primeira aba com erro
+      if (
+        errors.name ||
+        errors.address ||
+        errors.neighborhood ||
+        errors.description
+      ) {
+        if (activeTab !== "basic") setActiveTab("basic");
+        toast.error("Verifique os campos obrigatórios na aba 'Básico'.");
+        return;
+      }
+      if (
+        errors.size ||
+        errors.hostName ||
+        errors.hostPhone ||
+        errors.specialties ||
+        errors.modalities
+      ) {
+        if (activeTab !== "details") setActiveTab("details");
+        toast.error(
+          "Verifique os campos obrigatórios na aba 'Detalhes' (Tamanho, Anfitrião, etc)."
+        );
+        return;
+      }
+      toast.error(
+        "Existem campos obrigatórios não preenchidos. Verifique as abas."
+      );
+    }
+  };
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       const { hostName, hostPhone, managerName, managerPhone, ...rest } =
         values;
+
+      // Lógica de Fallback: Se não preencheu gerente, usa o anfitrião
+      const finalManagerName =
+        managerName && managerName.trim() !== "" ? managerName : hostName;
+      const finalManagerPhone =
+        managerPhone && managerPhone.trim() !== "" ? managerPhone : hostPhone;
 
       const roomData: Partial<Room> = {
         ...rest,
         modalities: rest.modalities as RoomModality[],
         specialties: rest.specialties as RoomSpecialty[],
         host: { name: hostName, phone: hostPhone },
-        manager: { name: managerName, phone: managerPhone },
+        manager: { name: finalManagerName, phone: finalManagerPhone },
       };
 
       if (roomToEdit) {
@@ -257,7 +300,7 @@ export function RoomManagementModal({
       onClose();
     } catch (error) {
       console.error(error);
-      toast.error("Erro ao salvar sala. Tente novamente.");
+      toast.error("Erro ao salvar sala no servidor.");
     }
   };
 
@@ -287,19 +330,23 @@ export function RoomManagementModal({
             {roomToEdit ? "Editar Sala" : "Cadastrar Nova Sala"}
           </DialogTitle>
           <DialogDescription>
-            Preencha os dados da sala. Seus dados são salvos automaticamente
-            enquanto digita.
+            Preencha os dados da sala. Se faltar algo, nós te avisamos.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
           <Form {...form}>
+            {/* Adicionado tratamento de erro no handleSubmit */}
             <form
               id="room-form"
-              onSubmit={form.handleSubmit(onSubmit)}
+              onSubmit={form.handleSubmit(onSubmit, onInvalid)}
               className="space-y-6"
             >
-              <Tabs defaultValue="basic" className="w-full">
+              <Tabs
+                value={activeTab}
+                onValueChange={setActiveTab}
+                className="w-full"
+              >
                 <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="basic">Básico</TabsTrigger>
                   <TabsTrigger value="details">Detalhes</TabsTrigger>
@@ -314,7 +361,7 @@ export function RoomManagementModal({
                       name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Nome da Sala</FormLabel>
+                          <FormLabel>Nome da Sala *</FormLabel>
                           <FormControl>
                             <Input
                               placeholder="Ex: Consultório Premium 01"
@@ -330,7 +377,7 @@ export function RoomManagementModal({
                       name="neighborhood"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Bairro</FormLabel>
+                          <FormLabel>Bairro *</FormLabel>
                           <Select
                             onValueChange={field.onChange}
                             value={field.value}
@@ -367,7 +414,7 @@ export function RoomManagementModal({
                     name="address"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Endereço Completo</FormLabel>
+                        <FormLabel>Endereço Completo *</FormLabel>
                         <FormControl>
                           <Input placeholder="Rua, Número, CEP" {...field} />
                         </FormControl>
@@ -388,9 +435,6 @@ export function RoomManagementModal({
                             {...field}
                           />
                         </FormControl>
-                        <FormDescription>
-                          Ajuda o cliente a localizar a sala.
-                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -401,7 +445,7 @@ export function RoomManagementModal({
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Descrição</FormLabel>
+                        <FormLabel>Descrição *</FormLabel>
                         <FormControl>
                           <Textarea
                             placeholder="Descreva os diferenciais da sala..."
@@ -419,7 +463,7 @@ export function RoomManagementModal({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border p-4 rounded-lg bg-muted/10">
                     <div className="space-y-3">
                       <h4 className="font-semibold text-sm text-primary flex items-center gap-2">
-                        Dados do Anfitrião (Proprietário)
+                        Dados do Anfitrião (Obrigatório)
                       </h4>
                       <FormField
                         control={form.control}
@@ -460,9 +504,12 @@ export function RoomManagementModal({
                     </div>
 
                     <div className="space-y-3">
-                      <h4 className="font-semibold text-sm text-primary flex items-center gap-2">
-                        Dados do Responsável (Gerente)
+                      <h4 className="font-semibold text-sm text-muted-foreground flex items-center gap-2">
+                        Dados do Responsável (Opcional)
                       </h4>
+                      <p className="text-xs text-muted-foreground">
+                        Se vazio, usaremos os dados do anfitrião.
+                      </p>
                       <FormField
                         control={form.control}
                         name="managerName"
@@ -471,7 +518,7 @@ export function RoomManagementModal({
                             <FormLabel>Nome</FormLabel>
                             <FormControl>
                               <Input
-                                placeholder="Nome do gerente/responsável"
+                                placeholder="Gerente (opcional)"
                                 {...field}
                               />
                             </FormControl>
@@ -508,7 +555,7 @@ export function RoomManagementModal({
                       name="size"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Tamanho (m²)</FormLabel>
+                          <FormLabel>Tamanho (m²) *</FormLabel>
                           <FormControl>
                             <Input type="number" {...field} />
                           </FormControl>
@@ -518,7 +565,6 @@ export function RoomManagementModal({
                     />
                   </div>
 
-                  {/* Seção de Equipamentos - Tag Input */}
                   <div className="space-y-2">
                     <FormLabel>Equipamentos Disponíveis</FormLabel>
                     <div className="border p-4 rounded-lg bg-card space-y-3">
@@ -544,8 +590,7 @@ export function RoomManagementModal({
                         {(!form.watch("equipment") ||
                           form.watch("equipment")?.length === 0) && (
                           <span className="text-muted-foreground text-sm italic">
-                            Nenhum equipamento listado. Digite abaixo para
-                            adicionar.
+                            Nenhum equipamento. Digite abaixo.
                           </span>
                         )}
                       </div>
@@ -555,7 +600,7 @@ export function RoomManagementModal({
                           value={equipmentInput}
                           onChange={(e) => setEquipmentInput(e.target.value)}
                           onKeyDown={handleAddEquipment}
-                          placeholder="Digite o nome do equipamento e tecle Enter ou Vírgula..."
+                          placeholder="Digite e tecle Enter..."
                           className="flex-1"
                         />
                         <Button
@@ -566,14 +611,11 @@ export function RoomManagementModal({
                           Adicionar
                         </Button>
                       </div>
-                      <FormDescription>
-                        Ex: Maca Elétrica, Ultrassom, Ar Condicionado.
-                      </FormDescription>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <FormLabel>Especialidades Aceitas</FormLabel>
+                    <FormLabel>Especialidades Aceitas *</FormLabel>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2 border p-3 rounded-lg">
                       {Object.entries(specialtyLabels).map(([key, label]) => (
                         <FormField
@@ -609,6 +651,97 @@ export function RoomManagementModal({
                         />
                       ))}
                     </div>
+                    {form.formState.errors.specialties && (
+                      <p className="text-sm font-medium text-destructive">
+                        Selecione pelo menos uma especialidade
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <FormLabel>Modalidades de Aluguel *</FormLabel>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border p-3 rounded-lg">
+                      <FormField
+                        control={form.control}
+                        name="modalities"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes("hourly")}
+                                onCheckedChange={(checked) => {
+                                  return checked
+                                    ? field.onChange([...field.value, "hourly"])
+                                    : field.onChange(
+                                        field.value?.filter(
+                                          (v) => v !== "hourly"
+                                        )
+                                      );
+                                }}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              Por Hora
+                            </FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="modalities"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes("shift")}
+                                onCheckedChange={(checked) => {
+                                  return checked
+                                    ? field.onChange([...field.value, "shift"])
+                                    : field.onChange(
+                                        field.value?.filter(
+                                          (v) => v !== "shift"
+                                        )
+                                      );
+                                }}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              Por Turno
+                            </FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="modalities"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes("fixed")}
+                                onCheckedChange={(checked) => {
+                                  return checked
+                                    ? field.onChange([...field.value, "fixed"])
+                                    : field.onChange(
+                                        field.value?.filter(
+                                          (v) => v !== "fixed"
+                                        )
+                                      );
+                                }}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              Mensal
+                            </FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    {form.formState.errors.modalities && (
+                      <p className="text-sm font-medium text-destructive">
+                        Selecione pelo menos uma modalidade
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
