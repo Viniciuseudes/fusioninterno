@@ -8,12 +8,11 @@ import {
   MapPin,
   Check,
   Ruler,
-  Phone,
-  Share2,
   Navigation,
+  Share2,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button"; // Mantido para o botão de compartilhar
 import {
   Carousel,
   CarouselContent,
@@ -24,7 +23,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
-// Interface restaurada para aceitar roomId (string)
+// Interface para receber o ID
 interface PublicRoomViewProps {
   roomId: string;
 }
@@ -39,7 +38,6 @@ export function PublicRoomView({ roomId }: PublicRoomViewProps) {
     async function load() {
       if (!roomId) return;
       try {
-        // Tenta buscar por ID direto
         const data = await RoomService.getRoomById(roomId);
         if (isMounted) setRoom(data);
       } catch (error) {
@@ -55,35 +53,8 @@ export function PublicRoomView({ roomId }: PublicRoomViewProps) {
     };
   }, [roomId]);
 
-  if (loading) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-background">
-        <Loader2 className="animate-spin h-8 w-8 text-primary" />
-      </div>
-    );
-  }
-
-  if (!room) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center bg-background text-muted-foreground gap-4">
-        <p>Sala não encontrada ou indisponível.</p>
-        <Button onClick={() => window.location.reload()}>
-          Tentar Novamente
-        </Button>
-      </div>
-    );
-  }
-
-  // Tratamento seguro para evitar quebras se manager ou phone forem undefined
-  const managerPhone = room.manager?.phone || room.host?.phone || "";
-  const cleanPhone = managerPhone.replace(/\D/g, "");
-  const whatsappLink = cleanPhone
-    ? `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(
-        `Olá, vi a sala ${room.name} no Fusion e gostaria de mais informações.`
-      )}`
-    : "#";
-
   const handleShare = () => {
+    if (!room) return;
     if (navigator.share) {
       navigator.share({
         title: `Fusion Clinic - ${room.name}`,
@@ -96,18 +67,42 @@ export function PublicRoomView({ roomId }: PublicRoomViewProps) {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <Loader2 className="animate-spin h-8 w-8 text-primary" />
+      </div>
+    );
+  }
+
+  if (!room) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-background text-muted-foreground gap-4">
+        <p>Sala não encontrada ou indisponível.</p>
+        <Button onClick={() => window.location.reload()} variant="outline">
+          Tentar Novamente
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background pb-24 animate-in fade-in duration-500">
+    // Reduzi o padding-bottom (pb-10) já que não tem mais footer fixo
+    <div className="min-h-screen bg-background pb-10 animate-in fade-in duration-500">
       {/* Header Imersivo */}
-      <div className="relative h-[40vh] md:h-[55vh] bg-black">
+      <div className="relative h-[40vh] md:h-[55vh] bg-black flex items-center justify-center overflow-hidden">
         <Carousel className="w-full h-full">
           <CarouselContent>
             {room.images && room.images.length > 0 ? (
               room.images.map((img, i) => (
-                <CarouselItem key={i} className="h-[40vh] md:h-[55vh]">
+                <CarouselItem
+                  key={i}
+                  className="h-[40vh] md:h-[55vh] flex items-center justify-center bg-black"
+                >
+                  {/* ALTERADO: object-contain para não cortar a imagem e removido opacity */}
                   <img
                     src={img}
-                    className="w-full h-full object-cover opacity-90"
+                    className="max-w-full max-h-full object-contain"
                     alt={`Foto ${i + 1}`}
                   />
                 </CarouselItem>
@@ -122,15 +117,16 @@ export function PublicRoomView({ roomId }: PublicRoomViewProps) {
           </CarouselContent>
           {room.images && room.images.length > 1 && (
             <>
-              <CarouselPrevious className="left-4 bg-black/20 hover:bg-black/40 text-white border-none" />
-              <CarouselNext className="right-4 bg-black/20 hover:bg-black/40 text-white border-none" />
+              <CarouselPrevious className="left-4 bg-black/50 hover:bg-black/70 text-white border-none" />
+              <CarouselNext className="right-4 bg-black/50 hover:bg-black/70 text-white border-none" />
             </>
           )}
         </Carousel>
 
-        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-background via-background/80 to-transparent h-40" />
+        {/* Gradiente para garantir leitura do texto sobre fotos claras */}
+        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-background via-background/80 to-transparent h-32 pointer-events-none" />
 
-        <div className="absolute bottom-4 left-4 right-4 md:left-8 md:right-8 flex items-end justify-between">
+        <div className="absolute bottom-4 left-4 right-4 md:left-8 md:right-8 flex items-end justify-between z-10">
           <div className="space-y-1">
             <Badge
               variant="secondary"
@@ -147,11 +143,13 @@ export function PublicRoomView({ roomId }: PublicRoomViewProps) {
             </p>
           </div>
 
+          {/* Mantive apenas o botão de compartilhar, discreto */}
           <Button
             variant="secondary"
             size="icon"
-            className="rounded-full shadow-lg shrink-0 mb-2"
+            className="rounded-full shadow-lg shrink-0 mb-2 hover:bg-primary hover:text-primary-foreground transition-colors"
             onClick={handleShare}
+            title="Compartilhar Sala"
           >
             <Share2 className="h-4 w-4" />
           </Button>
@@ -201,6 +199,7 @@ export function PublicRoomView({ roomId }: PublicRoomViewProps) {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="md:col-span-2 space-y-8">
+            {/* Descrição e Ref */}
             <div className="space-y-4">
               <h2 className="text-lg font-semibold border-l-4 border-primary pl-3">
                 Sobre o Espaço
@@ -226,6 +225,7 @@ export function PublicRoomView({ roomId }: PublicRoomViewProps) {
 
             <Separator />
 
+            {/* Detalhes Técnicos */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h3 className="font-medium mb-3 text-muted-foreground uppercase text-xs tracking-wider">
@@ -262,6 +262,7 @@ export function PublicRoomView({ roomId }: PublicRoomViewProps) {
             </div>
           </div>
 
+          {/* Coluna Lateral (Infraestrutura) */}
           <div className="md:col-span-1">
             <div className="bg-card border rounded-xl p-5 shadow-sm space-y-4 sticky top-4">
               <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">
@@ -310,28 +311,7 @@ export function PublicRoomView({ roomId }: PublicRoomViewProps) {
         </div>
       </div>
 
-      <div className="fixed bottom-0 inset-x-0 p-4 bg-background/80 backdrop-blur-lg border-t z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
-          <div className="hidden md:block">
-            <p className="text-sm font-medium">
-              Fale com{" "}
-              {room.manager?.name || room.host?.name || "o responsável"}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Tire dúvidas ou agende uma visita
-            </p>
-          </div>
-          <Button
-            size="lg"
-            className="w-full md:w-auto bg-[#25D366] hover:bg-[#128C7E] text-white font-bold shadow-green-900/20 shadow-lg transition-all active:scale-95"
-            onClick={() => window.open(whatsappLink, "_blank")}
-            disabled={!cleanPhone}
-          >
-            <Phone className="h-5 w-5 mr-2" />
-            Chamar no WhatsApp
-          </Button>
-        </div>
-      </div>
+      {/* RODAPÉ REMOVIDO CONFORME SOLICITADO */}
     </div>
   );
 }
