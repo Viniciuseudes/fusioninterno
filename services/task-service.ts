@@ -51,8 +51,10 @@ function adaptNotification(dbNote: any): any {
 }
 
 export const TaskService = {
+  // --- LEITURA DE DADOS ---
+
   async getTeams(): Promise<Team[]> {
-    const { data, error } = await supabase.from('teams').select('*')
+    const { data, error } = await supabase.from('teams').select('*').order('name');
     if (error) return []
     return data.map((t: any) => ({
       id: t.id,
@@ -93,6 +95,8 @@ export const TaskService = {
     if (error) return []
     return data.map(adaptTask)
   },
+
+  // --- GESTÃO DE TAREFAS ---
 
   async createTask(task: Partial<Task>, creatorId: string) {
     const { data: newTask, error } = await supabase
@@ -240,6 +244,8 @@ export const TaskService = {
     }
   },
 
+  // --- GESTÃO DE EQUIPES ---
+
   async createTeam(name: string, description: string) {
     const { data, error } = await supabase
       .from('teams')
@@ -261,7 +267,24 @@ export const TaskService = {
     }
   },
 
+  async updateTeam(id: string, updates: { name: string; description: string }) {
+    const { error } = await supabase
+      .from('teams')
+      .update(updates)
+      .eq('id', id)
+    if (error) throw error
+  },
+
+  async deleteTeam(id: string) {
+    // Nota: Requer ON DELETE CASCADE no banco nas tabelas relacionadas (tasks, profiles, etc)
+    const { error } = await supabase.from('teams').delete().eq('id', id)
+    if (error) throw error
+  },
+
+  // --- GESTÃO DE MEMBROS ---
+
   async createMember(member: { name: string; email: string; role: 'gestor' | 'membro'; teamId: string }) {
+    // Gera um UUID falso para permitir cadastro sem Auth (requer ajuste no banco: remover FK se existir restrição estrita)
     const fakeId = crypto.randomUUID(); 
 
     const { data, error } = await supabase
@@ -300,7 +323,8 @@ export const TaskService = {
     if (error) throw error
   },
 
-  // CORREÇÃO: Adicionado tipo de retorno CalendarEvent[] e preenchimento de campos User obrigatórios
+  // --- CALENDÁRIO ---
+
   async getEvents(currentUser: User): Promise<CalendarEvent[]> {
     const { data, error } = await supabase
       .from('calendar_events')
@@ -328,7 +352,6 @@ export const TaskService = {
       location: evt.location,
       teamId: evt.team_id,
       isGeneral: evt.is_general,
-      // Preenchimento completo do objeto User
       createdBy: evt.created_by_profile ? {
         id: evt.created_by_profile.id,
         name: evt.created_by_profile.name,
@@ -344,7 +367,6 @@ export const TaskService = {
         role: "gestor",
         teamId: ""
       },
-      // Preenchimento completo dos participantes (User[])
       participants: evt.event_participants?.map((ep: any) => ({
         id: ep.profiles.id,
         name: ep.profiles.name,
@@ -386,6 +408,8 @@ export const TaskService = {
 
     return newEvent
   },
+
+  // --- NOTIFICAÇÕES ---
 
   async getNotifications(userId: string) {
     const { data, error } = await supabase

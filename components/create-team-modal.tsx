@@ -1,26 +1,42 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Users, AlignLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Team } from "@/lib/data";
 
 interface CreateTeamModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (name: string, description: string) => Promise<void>;
+  teamToEdit?: Team | null; // Adicionado para suportar edição
 }
 
 export function CreateTeamModal({
   isOpen,
   onClose,
   onCreate,
+  teamToEdit,
 }: CreateTeamModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Preenche o formulário se estiver editando
+  useEffect(() => {
+    if (isOpen) {
+      if (teamToEdit) {
+        setName(teamToEdit.name);
+        setDescription(teamToEdit.description);
+      } else {
+        setName("");
+        setDescription("");
+      }
+    }
+  }, [isOpen, teamToEdit]);
 
   const handleSubmit = async () => {
     if (!name.trim()) return;
@@ -29,7 +45,7 @@ export function CreateTeamModal({
       await onCreate(name, description);
       handleClose();
     } catch (error) {
-      console.error("Erro ao criar equipe", error);
+      console.error("Erro ao salvar equipe", error);
     } finally {
       setIsSubmitting(false);
     }
@@ -46,15 +62,16 @@ export function CreateTeamModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={handleClose} />
-      <div className="relative bg-card rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-        {/* Header */}
+      <div className="relative bg-card rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between p-6 border-b border-border">
           <div>
             <h2 className="text-xl font-semibold text-foreground">
-              Nova Equipe
+              {teamToEdit ? "Editar Equipe" : "Nova Equipe"}
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Crie um novo setor ou time
+              {teamToEdit
+                ? "Altere os dados da equipe"
+                : "Crie um novo setor ou time"}
             </p>
           </div>
           <Button variant="ghost" size="icon" onClick={handleClose}>
@@ -62,7 +79,6 @@ export function CreateTeamModal({
           </Button>
         </div>
 
-        {/* Content */}
         <div className="p-6 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="team-name" className="flex items-center gap-2">
@@ -94,7 +110,6 @@ export function CreateTeamModal({
           </div>
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-end gap-3 p-6 border-t border-border bg-muted/30">
           <Button
             variant="outline"
@@ -111,8 +126,10 @@ export function CreateTeamModal({
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Criando...
+                Salvando...
               </>
+            ) : teamToEdit ? (
+              "Salvar Alterações"
             ) : (
               "Criar Equipe"
             )}

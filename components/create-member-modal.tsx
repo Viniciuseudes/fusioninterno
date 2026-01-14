@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { TaskService } from "@/services/task-service";
 import { Team } from "@/lib/data";
+import { toast } from "sonner"; // Usando Sonner para feedback melhor
 
 interface CreateMemberModalProps {
   isOpen: boolean;
@@ -58,9 +59,18 @@ export function CreateMemberModal({
     try {
       await onCreate({ name, email, role, teamId });
       handleClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao cadastrar membro", error);
-      alert("Erro ao cadastrar membro. Verifique se o e-mail já existe.");
+      // Feedback mais específico para o usuário
+      if (error.code === "23505") {
+        toast.error("Este e-mail já está cadastrado.");
+      } else if (error.code === "23503") {
+        toast.error(
+          "Erro de permissão no banco de dados (FK). Contate o suporte."
+        );
+      } else {
+        toast.error("Erro ao cadastrar membro. Tente novamente.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -78,15 +88,14 @@ export function CreateMemberModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={handleClose} />
-      <div className="relative bg-card rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-        {/* Header */}
+      <div className="relative bg-card rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between p-6 border-b border-border">
           <div>
             <h2 className="text-xl font-semibold text-foreground">
               Cadastrar Membro
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Adicione um novo colaborador ao sistema
+              Adicione um novo colaborador manualmente
             </p>
           </div>
           <Button variant="ghost" size="icon" onClick={handleClose}>
@@ -94,7 +103,6 @@ export function CreateMemberModal({
           </Button>
         </div>
 
-        {/* Content */}
         <div className="p-6 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name" className="flex items-center gap-2">
@@ -172,7 +180,6 @@ export function CreateMemberModal({
           </div>
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-end gap-3 p-6 border-t border-border bg-muted/30">
           <Button
             variant="outline"

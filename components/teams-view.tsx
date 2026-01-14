@@ -14,6 +14,12 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Users,
   FolderKanban,
   Search,
@@ -23,11 +29,15 @@ import {
   Shield,
   AlertCircle,
   Loader2,
+  MoreVertical,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { useUser } from "@/contexts/user-context";
 import { TaskService } from "@/services/task-service";
 import { CreateTeamModal } from "@/components/create-team-modal";
-import { CreateMemberModal } from "@/components/create-member-modal"; // Import novo
+import { CreateMemberModal } from "@/components/create-member-modal";
+import { toast } from "sonner";
 
 export function TeamsView() {
   const { currentUser, isGestor } = useUser();
@@ -36,14 +46,13 @@ export function TeamsView() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Modais
+  // Estado para Edição
+  const [teamToEdit, setTeamToEdit] = useState<Team | null>(null);
   const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
   const [isCreateMemberOpen, setIsCreateMemberOpen] = useState(false);
 
-  // Função para recarregar dados
   const loadData = async () => {
     if (!currentUser) return;
-    // Não ativa isLoading geral para não piscar a tela toda se for apenas refresh
     try {
       const [fetchedTeams, fetchedUsers] = await Promise.all([
         TaskService.getTeams(),
@@ -69,17 +78,63 @@ export function TeamsView() {
     loadData();
   }, [currentUser]);
 
-  const handleCreateTeam = async (name: string, description: string) => {
-    await TaskService.createTeam(name, description);
-    loadData(); // Recarrega para mostrar a nova equipe
+  // Criação e Edição de Equipe unificadas
+  const handleSaveTeam = async (name: string, description: string) => {
+    try {
+      if (teamToEdit) {
+        await TaskService.updateTeam(teamToEdit.id, { name, description });
+        toast.success("Equipe atualizada com sucesso!");
+      } else {
+        await TaskService.createTeam(name, description);
+        toast.success("Equipe criada com sucesso!");
+      }
+      loadData();
+      setIsCreateTeamOpen(false);
+      setTeamToEdit(null);
+    } catch (error) {
+      toast.error("Erro ao salvar equipe.");
+    }
+  };
+
+  const handleDeleteTeam = async (id: string) => {
+    if (
+      confirm(
+        "Tem certeza que deseja excluir esta equipe? As tarefas associadas podem ficar órfãs."
+      )
+    ) {
+      try {
+        await TaskService.deleteTeam(id);
+        toast.success("Equipe excluída.");
+        loadData();
+      } catch (error) {
+        toast.error("Erro ao excluir equipe.");
+      }
+    }
   };
 
   const handleCreateMember = async (member: any) => {
-    await TaskService.createMember(member);
-    loadData(); // Recarrega para mostrar o novo membro na lista
+    try {
+      await TaskService.createMember(member);
+      toast.success("Membro cadastrado com sucesso!");
+      loadData();
+    } catch (error) {
+      // O erro real já é tratado no modal, mas garantimos aqui também
+      console.error(error);
+    }
   };
 
-  // Filtragem local
+  // Abre modal de criação (limpo)
+  const openCreateModal = () => {
+    setTeamToEdit(null);
+    setIsCreateTeamOpen(true);
+  };
+
+  // Abre modal de edição (com dados)
+  const openEditModal = (team: Team) => {
+    setTeamToEdit(team);
+    setIsCreateTeamOpen(true);
+  };
+
   const filteredTeams = teams.filter((team) => {
     const matchesSearch = team.name
       .toLowerCase()
@@ -101,16 +156,13 @@ export function TeamsView() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">Equipes</h1>
-            <Badge
-              variant={isGestor ? "default" : "secondary"}
-              className={isGestor ? "bg-primary" : ""}
-            >
+            <Badge variant={isGestor ? "default" : "secondary"}>
               {isGestor ? "Todas as Equipes" : "Minha Equipe"}
             </Badge>
           </div>
@@ -121,7 +173,7 @@ export function TeamsView() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="relative w-64">
+          <div className="relative w-64 hidden md:block">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar equipes..."
@@ -133,7 +185,7 @@ export function TeamsView() {
           {isGestor && (
             <Button
               className="bg-primary hover:bg-primary/90"
-              onClick={() => setIsCreateTeamOpen(true)}
+              onClick={openCreateModal}
             >
               <Plus className="h-4 w-4 mr-2" />
               Nova Equipe
@@ -148,8 +200,8 @@ export function TeamsView() {
           <div>
             <p className="font-medium">Acesso Limitado</p>
             <p className="text-sm text-muted-foreground">
-              Você está visualizando apenas sua equipe. Para ver todas as
-              equipes, solicite acesso de gestor.
+              Você está visualizando apenas sua equipe. Para ver todas, solicite
+              acesso de gestor.
             </p>
           </div>
         </div>
@@ -157,20 +209,26 @@ export function TeamsView() {
 
       {/* Teams Grid */}
       {filteredTeams.length === 0 ? (
-        <div className="text-center py-10 text-muted-foreground border rounded-lg border-dashed">
+        <div className="text-center py-10 text-muted-foreground border rounded-lg border-dashed bg-muted/10">
           <Users className="h-10 w-10 mx-auto mb-2 opacity-50" />
           <p>Nenhuma equipe encontrada.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredTeams.map((team) => (
-            <TeamCard key={team.id} team={team} isGestor={isGestor} />
+            <TeamCard
+              key={team.id}
+              team={team}
+              isGestor={isGestor}
+              onEdit={() => openEditModal(team)}
+              onDelete={() => handleDeleteTeam(team.id)}
+            />
           ))}
         </div>
       )}
 
       {/* All Members Section */}
-      <div className="bg-card rounded-lg border border-border p-6">
+      <div className="bg-card rounded-lg border border-border p-6 shadow-sm">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold">
@@ -193,9 +251,9 @@ export function TeamsView() {
           {visibleMembers.map((user) => (
             <div
               key={user.id}
-              className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+              className="flex items-center gap-3 p-3 rounded-lg border border-transparent hover:border-border hover:bg-muted/50 transition-all cursor-pointer group"
             >
-              <Avatar className="h-10 w-10">
+              <Avatar className="h-10 w-10 border border-background shadow-sm">
                 <AvatarImage
                   src={user.avatar || "/placeholder.svg"}
                   alt={user.name}
@@ -204,18 +262,18 @@ export function TeamsView() {
               </Avatar>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="font-medium truncate">{user.name}</p>
+                  <p className="font-medium truncate text-sm">{user.name}</p>
                   {user.role === "gestor" && (
-                    <Shield className="h-3.5 w-3.5 text-primary" />
+                    <Shield className="h-3 w-3 text-primary" />
                   )}
                 </div>
-                <p className="text-sm text-muted-foreground truncate">
+                <p className="text-xs text-muted-foreground truncate">
                   {user.email}
                 </p>
               </div>
               <Badge
                 variant={user.role === "gestor" ? "default" : "secondary"}
-                className="text-xs"
+                className="text-[10px] h-5 px-1.5"
               >
                 {user.role === "gestor" ? "Gestor" : "Membro"}
               </Badge>
@@ -227,7 +285,8 @@ export function TeamsView() {
       <CreateTeamModal
         isOpen={isCreateTeamOpen}
         onClose={() => setIsCreateTeamOpen(false)}
-        onCreate={handleCreateTeam}
+        onCreate={handleSaveTeam}
+        teamToEdit={teamToEdit}
       />
 
       <CreateMemberModal
@@ -239,58 +298,86 @@ export function TeamsView() {
   );
 }
 
-function TeamCard({ team, isGestor }: { team: Team; isGestor: boolean }) {
+function TeamCard({
+  team,
+  isGestor,
+  onEdit,
+  onDelete,
+}: {
+  team: Team;
+  isGestor: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   return (
-    <Card className="hover:shadow-md transition-shadow cursor-pointer">
+    <Card className="group hover:shadow-md transition-all border-l-4 border-l-primary/50 hover:border-l-primary">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Users className="h-5 w-5 text-primary" />
+          <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+            <Users className="h-5 w-5" />
           </div>
           {isGestor && (
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <Settings className="h-4 w-4" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 -mr-2 text-muted-foreground hover:text-foreground"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={onEdit}>
+                  <Pencil className="mr-2 h-4 w-4" /> Editar
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={onDelete}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
-        <CardTitle className="mt-3">{team.name}</CardTitle>
-        <CardDescription>{team.description || "Sem descrição"}</CardDescription>
+        <CardTitle className="mt-3 text-lg">{team.name}</CardTitle>
+        <CardDescription className="line-clamp-2 min-h-[40px]">
+          {team.description || "Sem descrição definida para esta equipe."}
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pt-2 border-t">
           <div className="flex -space-x-2">
             {team.members && team.members.length > 0 ? (
               <>
                 {team.members.slice(0, 4).map((member) => (
                   <Avatar
                     key={member.id}
-                    className="h-8 w-8 border-2 border-card"
+                    className="h-7 w-7 border-2 border-background"
                     title={member.name}
                   >
-                    <AvatarImage
-                      src={member.avatar || "/placeholder.svg"}
-                      alt={member.name}
-                    />
-                    <AvatarFallback className="text-xs">
+                    <AvatarImage src={member.avatar || "/placeholder.svg"} />
+                    <AvatarFallback className="text-[10px]">
                       {member.name.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
                 ))}
                 {team.members.length > 4 && (
-                  <div className="h-8 w-8 rounded-full bg-muted border-2 border-card flex items-center justify-center text-xs">
+                  <div className="h-7 w-7 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[10px] font-medium">
                     +{team.members.length - 4}
                   </div>
                 )}
               </>
             ) : (
               <span className="text-xs text-muted-foreground italic">
-                Sem membros
+                Vazio
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <FolderKanban className="h-4 w-4" />
-            <span>{team.projectCount} projetos</span>
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded-md">
+            <FolderKanban className="h-3.5 w-3.5" />
+            <span>{team.projectCount} projs</span>
           </div>
         </div>
       </CardContent>
