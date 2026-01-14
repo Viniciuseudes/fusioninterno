@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, User, Mail, Shield, Users, Loader2 } from "lucide-react";
+import { X, User, Mail, Shield, Users, Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,21 +14,19 @@ import {
 } from "@/components/ui/select";
 import { TaskService } from "@/services/task-service";
 import { Team } from "@/lib/data";
-import { toast } from "sonner"; // Usando Sonner para feedback melhor
+import { toast } from "sonner";
+import { createUserWithPassword } from "@/app/actions"; // Importa a Server Action
 
 interface CreateMemberModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (member: any) => Promise<void>;
+  onCreate: (member: any) => Promise<void>; // Mantido por compatibilidade, mas usaremos a action direta
 }
 
-export function CreateMemberModal({
-  isOpen,
-  onClose,
-  onCreate,
-}: CreateMemberModalProps) {
+export function CreateMemberModal({ isOpen, onClose }: CreateMemberModalProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState(""); // Novo campo
   const [role, setRole] = useState<"gestor" | "membro">("membro");
   const [teamId, setTeamId] = useState("");
   const [teams, setTeams] = useState<Team[]>([]);
@@ -42,7 +40,7 @@ export function CreateMemberModal({
         try {
           const data = await TaskService.getTeams();
           setTeams(data);
-          if (data.length > 0) setTeamId(data[0].id);
+          if (data.length > 0 && !teamId) setTeamId(data[0].id);
         } catch (error) {
           console.error(error);
         } finally {
@@ -54,23 +52,29 @@ export function CreateMemberModal({
   }, [isOpen]);
 
   const handleSubmit = async () => {
-    if (!name.trim() || !email.trim() || !teamId) return;
+    if (!name.trim() || !email.trim() || !password.trim() || !teamId) return;
+
     setIsSubmitting(true);
     try {
-      await onCreate({ name, email, role, teamId });
+      // Usa a Server Action para criar Auth + Profile
+      await createUserWithPassword({
+        name,
+        email,
+        password,
+        role,
+        teamId,
+      });
+
+      toast.success("Membro cadastrado com sucesso e acesso liberado!");
       handleClose();
+      // Opcional: Recarregar a página ou notificar o pai para atualizar a lista
+      window.location.reload();
     } catch (error: any) {
-      console.error("Erro ao cadastrar membro", error);
-      // Feedback mais específico para o usuário
-      if (error.code === "23505") {
-        toast.error("Este e-mail já está cadastrado.");
-      } else if (error.code === "23503") {
-        toast.error(
-          "Erro de permissão no banco de dados (FK). Contate o suporte."
-        );
-      } else {
-        toast.error("Erro ao cadastrar membro. Tente novamente.");
-      }
+      console.error("Erro ao cadastrar:", error);
+      toast.error(
+        error.message ||
+          "Erro ao criar usuário. Verifique se o email já existe."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -79,6 +83,7 @@ export function CreateMemberModal({
   const handleClose = () => {
     setName("");
     setEmail("");
+    setPassword("");
     setRole("membro");
     onClose();
   };
@@ -95,7 +100,7 @@ export function CreateMemberModal({
               Cadastrar Membro
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Adicione um novo colaborador manualmente
+              Crie o acesso para um novo colaborador
             </p>
           </div>
           <Button variant="ghost" size="icon" onClick={handleClose}>
@@ -121,7 +126,7 @@ export function CreateMemberModal({
           <div className="space-y-2">
             <Label htmlFor="email" className="flex items-center gap-2">
               <Mail className="h-4 w-4 text-muted-foreground" />
-              E-mail Corporativo *
+              E-mail de Login *
             </Label>
             <Input
               id="email"
@@ -129,6 +134,21 @@ export function CreateMemberModal({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="joao@empresa.com"
+              className="bg-background"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="password" className="flex items-center gap-2">
+              <Lock className="h-4 w-4 text-muted-foreground" />
+              Senha de Acesso *
+            </Label>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Mínimo 6 caracteres"
               className="bg-background"
             />
           </div>
@@ -156,7 +176,7 @@ export function CreateMemberModal({
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-muted-foreground" />
-                Equipe
+                Equipe Inicial
               </Label>
               <Select
                 value={teamId}
@@ -190,16 +210,22 @@ export function CreateMemberModal({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!name.trim() || !email.trim() || !teamId || isSubmitting}
+            disabled={
+              !name.trim() ||
+              !email.trim() ||
+              !password.trim() ||
+              !teamId ||
+              isSubmitting
+            }
             className="bg-primary hover:bg-primary/90"
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Salvando...
+                Criando...
               </>
             ) : (
-              "Cadastrar"
+              "Criar Acesso"
             )}
           </Button>
         </div>

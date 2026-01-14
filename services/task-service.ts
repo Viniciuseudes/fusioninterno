@@ -3,6 +3,8 @@ import { Task, User, Team, CalendarEvent } from "@/lib/data"
 
 const supabase = createClient()
 
+// --- ADAPTERS (Não alterar para manter compatibilidade) ---
+
 function adaptTask(dbTask: any): Task {
   return {
     id: dbTask.id,
@@ -51,18 +53,46 @@ function adaptNotification(dbNote: any): any {
 }
 
 export const TaskService = {
+  
   // --- LEITURA DE DADOS ---
 
+  // ATUALIZADO: Lógica para incluir Gestores em todas as equipes
   async getTeams(): Promise<Team[]> {
-    const { data, error } = await supabase.from('teams').select('*').order('name');
-    if (error) return []
-    return data.map((t: any) => ({
-      id: t.id,
-      name: t.name,
-      description: t.description,
-      members: [],
-      projectCount: 0
-    }))
+    const { data: teamsData, error: teamsError } = await supabase.from('teams').select('*').order('name');
+    if (teamsError) return [];
+
+    // Busca todos os usuários para distribuir nas equipes
+    const { data: usersData, error: usersError } = await supabase.from('profiles').select('*');
+    if (usersError) return [];
+
+    const allUsers = usersData.map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      avatar: p.avatar_url || "/placeholder-user.jpg",
+      email: p.email,
+      role: p.role,
+      teamId: p.team_id
+    }));
+
+    // Separa os gestores
+    const gestores = allUsers.filter((u: any) => u.role === 'gestor');
+
+    // Mapeia as equipes incluindo: Membros fixos + Gestores (em todas)
+    return teamsData.map((t: any) => {
+       const regularMembers = allUsers.filter((u: any) => u.teamId === t.id && u.role !== 'gestor');
+       
+       // Map para remover duplicatas (caso um gestor tenha o ID da equipe explícito)
+       const membersMap = new Map();
+       [...regularMembers, ...gestores].forEach(m => membersMap.set(m.id, m));
+
+       return {
+          id: t.id,
+          name: t.name,
+          description: t.description,
+          members: Array.from(membersMap.values()),
+          projectCount: 0 
+       };
+    });
   },
 
   async getAllUsers(): Promise<User[]> {
@@ -96,7 +126,7 @@ export const TaskService = {
     return data.map(adaptTask)
   },
 
-  // --- GESTÃO DE TAREFAS ---
+  // --- GESTÃO DE TAREFAS (Core) ---
 
   async createTask(task: Partial<Task>, creatorId: string) {
     const { data: newTask, error } = await supabase
@@ -116,6 +146,7 @@ export const TaskService = {
 
     if (error) throw error
 
+    // Adiciona os donos da tarefa
     if (task.owners && task.owners.length > 0) {
       const ownersData = task.owners.map(owner => ({
         task_id: newTask.id,
@@ -123,6 +154,7 @@ export const TaskService = {
       }))
       await supabase.from('task_owners').insert(ownersData)
 
+      // Gera notificações
       const notifications = task.owners
         .filter(owner => owner.id !== creatorId)
         .map(owner => ({
@@ -172,13 +204,11 @@ export const TaskService = {
   },
 
   async deleteTask(taskId: string) {
-    const { error } = await supabase
-      .from('tasks')
-      .delete()
-      .eq('id', taskId)
-
+    const { error } = await supabase.from('tasks').delete().eq('id', taskId)
     if (error) throw error
   },
+
+  // --- ARQUIVOS E MENSAGENS ---
 
   async uploadFile(file: File): Promise<string> {
     const fileExt = file.name.split('.').pop()
@@ -209,7 +239,8 @@ export const TaskService = {
       .single()
 
     if (error) throw error
-
+    
+    // Notifica outros participantes
     const { data: owners } = await supabase
       .from('task_owners')
       .select('user_id')
@@ -244,29 +275,26 @@ export const TaskService = {
     }
   },
 
-  // --- GESTÃO DE EQUIPES ---
+  // --- GESTÃO DE EQUIPES (NOVO CRUD) ---
 
   async createTeam(name: string, description: string) {
     const { data, error } = await supabase
       .from('teams')
-      .insert({
-        name,
-        description
-      })
+      .insert({ name, description })
       .select()
       .single()
 
     if (error) throw error
-
-    return {
-      id: data.id,
-      name: data.name,
-      description: data.description,
+    return { 
+      id: data.id, 
+      name: data.name, 
+      description: data.description, 
       members: [], 
-      projectCount: 0
+      projectCount: 0 
     }
   },
 
+  // Nova função para Editar Equipe
   async updateTeam(id: string, updates: { name: string; description: string }) {
     const { error } = await supabase
       .from('teams')
@@ -275,18 +303,21 @@ export const TaskService = {
     if (error) throw error
   },
 
+  // Nova função para Excluir Equipe
   async deleteTeam(id: string) {
-    // Nota: Requer ON DELETE CASCADE no banco nas tabelas relacionadas (tasks, profiles, etc)
-    const { error } = await supabase.from('teams').delete().eq('id', id)
+    const { error } = await supabase
+      .from('teams')
+      .delete()
+      .eq('id', id)
     if (error) throw error
   },
 
-  // --- GESTÃO DE MEMBROS ---
+  // --- GESTÃO DE MEMBROS E PERFIL ---
 
+  // Mantido para compatibilidade, cria perfil sem Auth (usuário fantasma)
+  // O novo modal usa a Server Action, mas mantemos isso aqui para não quebrar referências antigas
   async createMember(member: { name: string; email: string; role: 'gestor' | 'membro'; teamId: string }) {
-    // Gera um UUID falso para permitir cadastro sem Auth (requer ajuste no banco: remover FK se existir restrição estrita)
     const fakeId = crypto.randomUUID(); 
-
     const { data, error } = await supabase
       .from('profiles')
       .insert({
@@ -309,6 +340,24 @@ export const TaskService = {
       role: data.role,
       teamId: data.team_id
     }
+  },
+  
+  // NOVO: Adicionar membro existente a uma equipe
+  async addMemberToTeam(userId: string, teamId: string) {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ team_id: teamId })
+      .eq('id', userId)
+    if (error) throw error
+  },
+
+  // NOVO: Remover membro de uma equipe
+  async removeMemberFromTeam(userId: string) {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ team_id: null })
+      .eq('id', userId)
+    if (error) throw error
   },
 
   async updateProfile(userId: string, updates: { name?: string; avatarUrl?: string }) {
