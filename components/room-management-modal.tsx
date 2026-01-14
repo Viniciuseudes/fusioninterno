@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-// CORREÇÃO 1: Importando os tipos RoomModality e RoomSpecialty
+import { Badge } from "@/components/ui/badge"; // Importado Badge
 import {
   Room,
   RoomModality,
@@ -42,7 +42,7 @@ import {
   amenityLabels,
   specialtyLabels,
 } from "@/lib/data";
-import { Loader2, Trash2, Upload } from "lucide-react";
+import { Loader2, Trash2, Upload, X } from "lucide-react"; // Importado X
 import { RoomService } from "@/services/room-service";
 import { toast } from "sonner";
 
@@ -55,20 +55,38 @@ const formSchema = z.object({
   address: z.string().min(5, "Endereço completo obrigatório"),
   referencePoint: z.string().optional(),
   size: z.coerce.number().min(1, "Tamanho inválido"),
+
   modalities: z.array(z.string()).min(1, "Selecione pelo menos uma modalidade"),
   specialties: z
     .array(z.string())
     .min(1, "Selecione pelo menos uma especialidade"),
   amenities: z.array(z.string()),
+  equipment: z.array(z.string()),
+
   pricePerHour: z.coerce.number().optional(),
   pricePerShift: z.coerce.number().optional(),
   priceFixed: z.coerce.number().optional(),
+
   nightShiftAvailable: z.boolean().default(false),
   weekendAvailable: z.boolean().default(false),
-  hostName: z.string().min(2, "Nome do responsável obrigatório"),
+
+  hostName: z.string().min(2, "Nome do anfitrião obrigatório"),
   hostPhone: z.string().min(10, "Telefone inválido"),
+
+  managerName: z.string().min(2, "Nome do responsável obrigatório"),
+  managerPhone: z.string().min(10, "Telefone inválido"),
+
   images: z.array(z.string()).optional(),
 });
+
+// Função utilitária para máscara de telefone
+const formatPhone = (value: string) => {
+  if (!value) return "";
+  value = value.replace(/\D/g, "");
+  value = value.replace(/^(\d{2})(\d)/g, "($1) $2");
+  value = value.replace(/(\d)(\d{4})$/, "$1-$2");
+  return value.slice(0, 15);
+};
 
 interface RoomManagementModalProps {
   isOpen: boolean;
@@ -83,6 +101,8 @@ export function RoomManagementModal({
   roomToEdit,
   onSave,
 }: RoomManagementModalProps) {
+  const [equipmentInput, setEquipmentInput] = useState(""); // Estado local para o input de tags
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -95,10 +115,13 @@ export function RoomManagementModal({
       modalities: [],
       specialties: [],
       amenities: [],
+      equipment: [],
       nightShiftAvailable: false,
       weekendAvailable: false,
       hostName: "",
       hostPhone: "",
+      managerName: "",
+      managerPhone: "",
       images: [],
     },
   });
@@ -107,7 +130,6 @@ export function RoomManagementModal({
   useEffect(() => {
     if (isOpen) {
       if (roomToEdit) {
-        // Modo Edição: Carrega dados do banco
         form.reset({
           name: roomToEdit.name,
           description: roomToEdit.description,
@@ -118,6 +140,7 @@ export function RoomManagementModal({
           modalities: roomToEdit.modalities,
           specialties: roomToEdit.specialties,
           amenities: roomToEdit.amenities,
+          equipment: roomToEdit.equipment || [],
           pricePerHour: roomToEdit.pricePerHour,
           pricePerShift: roomToEdit.pricePerShift,
           priceFixed: roomToEdit.priceFixed,
@@ -125,10 +148,11 @@ export function RoomManagementModal({
           weekendAvailable: roomToEdit.weekendAvailable,
           hostName: roomToEdit.host.name,
           hostPhone: roomToEdit.host.phone,
+          managerName: roomToEdit.manager?.name || roomToEdit.host.name,
+          managerPhone: roomToEdit.manager?.phone || roomToEdit.host.phone,
           images: roomToEdit.images,
         });
       } else {
-        // Modo Criação: Tenta recuperar rascunho do LocalStorage
         const draft = localStorage.getItem(DRAFT_KEY);
         if (draft) {
           try {
@@ -139,7 +163,6 @@ export function RoomManagementModal({
             console.error("Erro ao restaurar rascunho", e);
           }
         } else {
-          // Limpa formulário se não houver rascunho
           form.reset({
             name: "",
             description: "",
@@ -150,10 +173,13 @@ export function RoomManagementModal({
             modalities: [],
             specialties: [],
             amenities: [],
+            equipment: [],
             nightShiftAvailable: false,
             weekendAvailable: false,
             hostName: "",
             hostPhone: "",
+            managerName: "",
+            managerPhone: "",
             images: [],
           });
         }
@@ -161,7 +187,7 @@ export function RoomManagementModal({
     }
   }, [roomToEdit, form, isOpen]);
 
-  // 2. Salvar Rascunho Automaticamente (apenas se não estiver editando)
+  // 2. Salvar Rascunho
   useEffect(() => {
     if (!roomToEdit && isOpen) {
       const subscription = form.watch((value) => {
@@ -171,18 +197,52 @@ export function RoomManagementModal({
     }
   }, [form.watch, roomToEdit, isOpen]);
 
+  // Lógica para adicionar Equipamento (Tag)
+  const handleAddEquipment = (
+    e: React.KeyboardEvent<HTMLInputElement> | React.MouseEvent
+  ) => {
+    // Se for evento de teclado, só aceita Enter ou Vírgula
+    if (
+      (e as React.KeyboardEvent).key &&
+      !["Enter", ","].includes((e as React.KeyboardEvent).key)
+    ) {
+      return;
+    }
+
+    e.preventDefault();
+    const trimmed = equipmentInput.trim().replace(/,$/, ""); // Remove vírgula final se houver
+
+    if (trimmed) {
+      const current = form.getValues("equipment") || [];
+      // Evita duplicatas (case insensitive opcional, aqui case sensitive)
+      if (!current.includes(trimmed)) {
+        form.setValue("equipment", [...current, trimmed]);
+        setEquipmentInput("");
+      } else {
+        toast.warning("Equipamento já adicionado");
+      }
+    }
+  };
+
+  const handleRemoveEquipment = (itemToRemove: string) => {
+    const current = form.getValues("equipment") || [];
+    form.setValue(
+      "equipment",
+      current.filter((item) => item !== itemToRemove)
+    );
+  };
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      // CORREÇÃO 2: Separar campos auxiliares e fazer o cast dos tipos
-      const { hostName, hostPhone, ...rest } = values;
+      const { hostName, hostPhone, managerName, managerPhone, ...rest } =
+        values;
 
       const roomData: Partial<Room> = {
         ...rest,
-        // Cast forçado para os tipos literais que o TS espera
         modalities: rest.modalities as RoomModality[],
         specialties: rest.specialties as RoomSpecialty[],
         host: { name: hostName, phone: hostPhone },
-        manager: { name: hostName, phone: hostPhone },
+        manager: { name: managerName, phone: managerPhone },
       };
 
       if (roomToEdit) {
@@ -191,7 +251,6 @@ export function RoomManagementModal({
       } else {
         await RoomService.createRoom(roomData);
         toast.success("Sala criada com sucesso!");
-        // Limpa o rascunho após sucesso
         localStorage.removeItem(DRAFT_KEY);
       }
       onSave();
@@ -330,8 +389,7 @@ export function RoomManagementModal({
                           />
                         </FormControl>
                         <FormDescription>
-                          Isso ajuda o cliente a localizar a sala mais
-                          facilmente.
+                          Ajuda o cliente a localizar a sala.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -358,6 +416,92 @@ export function RoomManagementModal({
                 </TabsContent>
 
                 <TabsContent value="details" className="space-y-4 mt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border p-4 rounded-lg bg-muted/10">
+                    <div className="space-y-3">
+                      <h4 className="font-semibold text-sm text-primary flex items-center gap-2">
+                        Dados do Anfitrião (Proprietário)
+                      </h4>
+                      <FormField
+                        control={form.control}
+                        name="hostName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nome</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Nome do proprietário"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="hostPhone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Telefone (WhatsApp)</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="(00) 00000-0000"
+                                {...field}
+                                onChange={(e) =>
+                                  field.onChange(formatPhone(e.target.value))
+                                }
+                                maxLength={15}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-3">
+                      <h4 className="font-semibold text-sm text-primary flex items-center gap-2">
+                        Dados do Responsável (Gerente)
+                      </h4>
+                      <FormField
+                        control={form.control}
+                        name="managerName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nome</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Nome do gerente/responsável"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="managerPhone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Telefone (WhatsApp)</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="(00) 00000-0000"
+                                {...field}
+                                onChange={(e) =>
+                                  field.onChange(formatPhone(e.target.value))
+                                }
+                                maxLength={15}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -372,35 +516,60 @@ export function RoomManagementModal({
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={form.control}
-                      name="hostName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Responsável (Anfitrião)</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="Nome do proprietário"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="hostPhone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Telefone (WhatsApp)</FormLabel>
-                          <FormControl>
-                            <Input placeholder="(84) 99999-9999" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  </div>
+
+                  {/* Seção de Equipamentos - Tag Input */}
+                  <div className="space-y-2">
+                    <FormLabel>Equipamentos Disponíveis</FormLabel>
+                    <div className="border p-4 rounded-lg bg-card space-y-3">
+                      <div className="flex flex-wrap gap-2 min-h-[30px]">
+                        {form.watch("equipment")?.map((item, index) => (
+                          <Badge
+                            key={index}
+                            variant="secondary"
+                            className="pl-2 pr-1 py-1 flex items-center gap-1 text-sm"
+                          >
+                            {item}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-4 w-4 rounded-full hover:bg-destructive/20 hover:text-destructive"
+                              onClick={() => handleRemoveEquipment(item)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </Badge>
+                        ))}
+                        {(!form.watch("equipment") ||
+                          form.watch("equipment")?.length === 0) && (
+                          <span className="text-muted-foreground text-sm italic">
+                            Nenhum equipamento listado. Digite abaixo para
+                            adicionar.
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Input
+                          value={equipmentInput}
+                          onChange={(e) => setEquipmentInput(e.target.value)}
+                          onKeyDown={handleAddEquipment}
+                          placeholder="Digite o nome do equipamento e tecle Enter ou Vírgula..."
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={handleAddEquipment as any}
+                        >
+                          Adicionar
+                        </Button>
+                      </div>
+                      <FormDescription>
+                        Ex: Maca Elétrica, Ultrassom, Ar Condicionado.
+                      </FormDescription>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -431,7 +600,7 @@ export function RoomManagementModal({
                                     }}
                                   />
                                 </FormControl>
-                                <FormLabel className="font-normal cursor-pointer">
+                                <FormLabel className="font-normal cursor-pointer text-sm">
                                   {label}
                                 </FormLabel>
                               </FormItem>
@@ -440,7 +609,6 @@ export function RoomManagementModal({
                         />
                       ))}
                     </div>
-                    <FormMessage />
                   </div>
 
                   <div className="space-y-2">
@@ -471,7 +639,7 @@ export function RoomManagementModal({
                                     }}
                                   />
                                 </FormControl>
-                                <FormLabel className="font-normal cursor-pointer">
+                                <FormLabel className="font-normal cursor-pointer text-sm">
                                   {label}
                                 </FormLabel>
                               </FormItem>
