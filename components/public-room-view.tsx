@@ -12,7 +12,7 @@ import {
   Share2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button"; // Mantido para o botão de compartilhar
+import { Button } from "@/components/ui/button";
 import {
   Carousel,
   CarouselContent,
@@ -23,7 +23,6 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
-// Interface para receber o ID
 interface PublicRoomViewProps {
   roomId: string;
 }
@@ -87,7 +86,6 @@ export function PublicRoomView({ roomId }: PublicRoomViewProps) {
   }
 
   return (
-    // Reduzi o padding-bottom (pb-10) já que não tem mais footer fixo
     <div className="min-h-screen bg-background pb-10 animate-in fade-in duration-500">
       {/* Header Imersivo */}
       <div className="relative h-[40vh] md:h-[55vh] bg-black flex items-center justify-center overflow-hidden">
@@ -99,7 +97,6 @@ export function PublicRoomView({ roomId }: PublicRoomViewProps) {
                   key={i}
                   className="h-[40vh] md:h-[55vh] flex items-center justify-center bg-black"
                 >
-                  {/* ALTERADO: object-contain para não cortar a imagem e removido opacity */}
                   <img
                     src={img}
                     className="max-w-full max-h-full object-contain"
@@ -123,31 +120,30 @@ export function PublicRoomView({ roomId }: PublicRoomViewProps) {
           )}
         </Carousel>
 
-        {/* Gradiente para garantir leitura do texto sobre fotos claras */}
-        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-background via-background/80 to-transparent h-32 pointer-events-none" />
+        {/* REMOVIDO: O gradiente que subia na foto foi retirado aqui */}
 
-        <div className="absolute bottom-4 left-4 right-4 md:left-8 md:right-8 flex items-end justify-between z-10">
-          <div className="space-y-1">
+        <div className="absolute bottom-4 left-4 right-4 md:left-8 md:right-8 flex items-end justify-between z-10 pointer-events-none">
+          <div className="space-y-1 pointer-events-auto">
             <Badge
               variant="secondary"
-              className="mb-2 bg-primary/20 text-primary border-primary/20 backdrop-blur-md"
+              className="mb-2 bg-black/60 text-white border-white/20 backdrop-blur-md hover:bg-black/70"
             >
               {room.neighborhood}
             </Badge>
-            <h1 className="text-2xl md:text-4xl font-bold text-foreground shadow-sm">
+            {/* Adicionado drop-shadow e cor branca para leitura sem o gradiente */}
+            <h1 className="text-2xl md:text-4xl font-bold text-white drop-shadow-md">
               {room.name}
             </h1>
-            <p className="flex items-center text-sm md:text-base text-muted-foreground">
+            <p className="flex items-center text-sm md:text-base text-white/90 drop-shadow-md font-medium">
               <MapPin className="h-4 w-4 mr-1 text-primary shrink-0" />
               {room.address}
             </p>
           </div>
 
-          {/* Mantive apenas o botão de compartilhar, discreto */}
           <Button
             variant="secondary"
             size="icon"
-            className="rounded-full shadow-lg shrink-0 mb-2 hover:bg-primary hover:text-primary-foreground transition-colors"
+            className="rounded-full shadow-lg shrink-0 mb-2 pointer-events-auto bg-white text-black hover:bg-gray-200"
             onClick={handleShare}
             title="Compartilhar Sala"
           >
@@ -310,8 +306,6 @@ export function PublicRoomView({ roomId }: PublicRoomViewProps) {
           </div>
         </div>
       </div>
-
-      {/* RODAPÉ REMOVIDO CONFORME SOLICITADO */}
     </div>
   );
 }
