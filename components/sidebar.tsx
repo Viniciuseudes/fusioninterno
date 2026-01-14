@@ -24,6 +24,7 @@ import {
 import { useUser } from "@/contexts/user-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TaskService } from "@/services/task-service";
+import { createClient } from "@/lib/supabase/client";
 
 interface SidebarProps {
   activeView: string;
@@ -42,12 +43,12 @@ export function Sidebar({
   const [mobileOpen, setMobileOpen] = useState(false);
   const { currentUser, isGestor, isLoading } = useUser();
   const [unreadCount, setUnreadCount] = useState(0);
+  const supabase = createClient();
 
-  // Polling simples para notificações (atualiza a cada 30s)
   useEffect(() => {
     if (!currentUser) return;
 
-    const checkNotifications = async () => {
+    const fetchNotifications = async () => {
       try {
         const notifs = await TaskService.getNotifications(currentUser.id);
         setUnreadCount(notifs.filter((n) => !n.read).length);
@@ -56,15 +57,32 @@ export function Sidebar({
       }
     };
 
-    checkNotifications(); // Checa ao montar
-    const interval = setInterval(checkNotifications, 30000); // Checa a cada 30s
-    return () => clearInterval(interval);
-  }, [currentUser]);
+    fetchNotifications();
+
+    const channel = supabase
+      .channel("notifications-count")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${currentUser.id}`,
+        },
+        () => {
+          fetchNotifications();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser, supabase]);
 
   const navItems = [
     { id: "dashboard", label: "Painel", icon: LayoutDashboard },
     { id: "tasks", label: "Minhas Tarefas", icon: CheckSquare },
-    // Badge dinâmico aqui
     {
       id: "inbox",
       label: "Caixa de Entrada",

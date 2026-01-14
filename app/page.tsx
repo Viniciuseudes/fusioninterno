@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { TaskTable } from "@/components/task-table";
 import { KanbanBoard } from "@/components/kanban-board";
-import { CalendarView } from "@/components/calendar-view"; // Certifique-se que este componente recebe as tasks
+import { CalendarView } from "@/components/calendar-view";
 import { TaskDetailModal } from "@/components/task-detail-modal";
 import { MyTasksView } from "@/components/my-tasks-view";
 import { InboxView } from "@/components/inbox-view";
@@ -18,6 +18,7 @@ import { type Task, sampleProject, getFilteredTasks } from "@/lib/data";
 import { useUser } from "@/contexts/user-context";
 import { Loader2 } from "lucide-react";
 import { TaskService } from "@/services/task-service";
+import { createClient } from "@/lib/supabase/client";
 
 export default function Home() {
   const [activeView, setActiveView] = useState("dashboard");
@@ -25,29 +26,47 @@ export default function Home() {
     "table"
   );
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
-
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
+
   const { currentUser, isLoading: isUserLoading } = useUser();
+  const supabase = createClient();
+
+  const loadTasks = useCallback(async () => {
+    if (!currentUser) return;
+    try {
+      const realTasks = await TaskService.getTasks(currentUser);
+      setTasks(realTasks);
+    } catch (error) {
+      console.error("Falha ao carregar tarefas", error);
+    } finally {
+      setIsDataLoading(false);
+    }
+  }, [currentUser]);
 
   useEffect(() => {
-    async function loadTasks() {
-      if (currentUser) {
-        setIsDataLoading(true);
-        try {
-          const realTasks = await TaskService.getTasks(currentUser);
-          setTasks(realTasks);
-        } catch (error) {
-          console.error("Falha ao carregar tarefas", error);
-        } finally {
-          setIsDataLoading(false);
-        }
-      }
-    }
     loadTasks();
-  }, [currentUser]);
+  }, [loadTasks]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const channel = supabase
+      .channel("tasks-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "tasks" },
+        () => {
+          loadTasks();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser, supabase, loadTasks]);
 
   const filteredTasks = useMemo(() => {
     if (!currentUser) return [];
@@ -59,23 +78,39 @@ export default function Home() {
       prev.map((t) => (t.id === updatedTask.id ? updatedTask : t))
     );
 
+    if (selectedTask?.id === updatedTask.id) {
+      setSelectedTask(updatedTask);
+    }
+
     try {
-      if (selectedTask?.status !== updatedTask.status) {
+      const current = tasks.find((t) => t.id === updatedTask.id);
+      if (current?.status !== updatedTask.status) {
         await TaskService.updateStatus(updatedTask.id, updatedTask.status);
+      } else {
+        await TaskService.updateTask(updatedTask.id, updatedTask);
       }
     } catch (error) {
-      console.error("Erro ao salvar atualização de status", error);
+      console.error("Erro ao salvar atualização", error);
+      loadTasks();
     }
   };
 
-  // NOVA FUNÇÃO: Remove tarefa da lista local após exclusão no modal
-  const handleTaskDelete = (taskId: string) => {
+  const handleTaskDelete = async (taskId: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
-    setSelectedTask(null); // Fecha o modal
+    setSelectedTask(null);
+    try {
+      await TaskService.deleteTask(taskId);
+    } catch (error) {
+      console.error("Erro ao deletar tarefa", error);
+      loadTasks();
+    }
   };
 
   const handleCreateTask = async (newTask: Task) => {
     if (!currentUser) return;
+
+    // Optimistic add (se tiver ID temporário, senão espera o banco)
+    // Aqui optamos por esperar o retorno do banco para garantir integridade do ID
     try {
       const createdTask = await TaskService.createTask(newTask, currentUser.id);
       setTasks((prev) => [createdTask, ...prev]);
@@ -122,9 +157,9 @@ export default function Home() {
                 <KanbanBoard
                   tasks={filteredTasks}
                   onTaskClick={setSelectedTask}
+                  onTaskUpdate={handleTaskUpdate}
                 />
               )}
-              {/* O CalendarView aqui agora recebe tarefas reais */}
               {viewMode === "calendar" && (
                 <CalendarView
                   tasks={filteredTasks}
@@ -141,7 +176,6 @@ export default function Home() {
       case "inbox":
         return <InboxView onTaskClick={setSelectedTask} />;
       case "calendar":
-        // FullCalendarView também deve ser atualizado para receber `tasks` se ainda não estiver
         return <FullCalendarView onTaskClick={setSelectedTask} />;
       case "teams":
         return <TeamsView />;
@@ -180,11 +214,7 @@ export default function Home() {
         <TaskDetailModal
           task={selectedTask}
           onClose={() => setSelectedTask(null)}
-          onUpdate={(updated) => {
-            handleTaskUpdate(updated);
-            setSelectedTask(updated);
-          }}
-          // Passamos a função de deletar
+          onUpdate={handleTaskUpdate}
           onDelete={handleTaskDelete}
         />
       )}
