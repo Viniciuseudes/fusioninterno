@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 
-// CORREÇÃO: Instanciamos o cliente executando a função exportada
+// Instancia o cliente
 const supabase = createClient();
 
 export type Post = {
@@ -8,7 +8,7 @@ export type Post = {
   title: string;
   slug: string;
   excerpt: string;
-  content: string;
+  content: string; // HTML do Rich Text
   cover_image: string;
   category: string;
   author_name: string;
@@ -24,7 +24,10 @@ export const blogService = {
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error("Erro ao buscar posts:", error);
+      throw error;
+    }
     return data as Post[];
   },
 
@@ -36,32 +39,62 @@ export const blogService = {
       .eq("id", id)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Erro ao buscar post por ID:", error);
+      throw error;
+    }
     return data as Post;
   },
 
   // Criar novo post
   async createPost(post: Partial<Post>) {
-    const { data, error } = await supabase.from("posts").insert([post]).select();
-    if (error) throw error;
+    // Remove campos undefined/vazios que podem quebrar o banco
+    const cleanPost = Object.fromEntries(
+      Object.entries(post).filter(([_, v]) => v != null)
+    );
+
+    console.log("Enviando Payload Criar:", cleanPost);
+
+    const { data, error } = await supabase
+      .from("posts")
+      .insert([cleanPost])
+      .select();
+
+    if (error) {
+      console.error("Erro Supabase Create:", error.message, error.details);
+      throw error;
+    }
     return data;
   },
 
   // Atualizar post
   async updatePost(id: number, updates: Partial<Post>) {
+    // Remove campos undefined
+    const cleanUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, v]) => v != null)
+    );
+
+    console.log("Enviando Payload Atualizar:", cleanUpdates);
+
     const { data, error } = await supabase
       .from("posts")
-      .update(updates)
+      .update(cleanUpdates)
       .eq("id", id)
       .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Erro Supabase Update:", error.message, error.details);
+      throw error;
+    }
     return data;
   },
 
   // Deletar post
   async deletePost(id: number) {
     const { error } = await supabase.from("posts").delete().eq("id", id);
-    if (error) throw error;
+    if (error) {
+      console.error("Erro Supabase Delete:", error);
+      throw error;
+    }
   },
 };
