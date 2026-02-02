@@ -23,7 +23,7 @@ import { createClient } from "@/lib/supabase/client";
 export default function Home() {
   const [activeView, setActiveView] = useState("dashboard");
   const [viewMode, setViewMode] = useState<"table" | "kanban" | "calendar">(
-    "table"
+    "table",
   );
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -59,7 +59,7 @@ export default function Home() {
         { event: "*", schema: "public", table: "tasks" },
         () => {
           loadTasks();
-        }
+        },
       )
       .subscribe();
 
@@ -75,7 +75,7 @@ export default function Home() {
 
   const handleTaskUpdate = async (updatedTask: Task) => {
     setTasks((prev) =>
-      prev.map((t) => (t.id === updatedTask.id ? updatedTask : t))
+      prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)),
     );
 
     if (selectedTask?.id === updatedTask.id) {

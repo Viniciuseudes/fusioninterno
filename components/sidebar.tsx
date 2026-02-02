@@ -20,6 +20,7 @@ import {
   Flame,
   Shield,
   DoorOpen,
+  BookOpen, // Novo ícone para o Blog
 } from "lucide-react";
 import { useUser } from "@/contexts/user-context";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -71,7 +72,7 @@ export function Sidebar({
         },
         () => {
           fetchNotifications();
-        }
+        },
       )
       .subscribe();
 
@@ -92,6 +93,7 @@ export function Sidebar({
     { id: "calendar", label: "Calendário", icon: Calendar },
     { id: "teams", label: "Equipes", icon: Users },
     { id: "rooms", label: "Encontre uma Sala", icon: DoorOpen },
+    { id: "blog", label: "Blog", icon: BookOpen }, // Item do Blog
   ];
 
   if (isLoading || !currentUser) {
@@ -99,7 +101,7 @@ export function Sidebar({
       <aside
         className={cn(
           "hidden md:flex h-screen bg-sidebar border-r border-sidebar-border w-64 flex-col p-4 space-y-4",
-          className
+          className,
         )}
       >
         <div className="flex items-center gap-2 mb-6">
@@ -138,7 +140,7 @@ export function Sidebar({
           "fixed md:relative z-50 h-screen bg-sidebar text-sidebar-foreground flex flex-col transition-all duration-300",
           collapsed ? "w-16" : "w-64",
           mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
-          className
+          className,
         )}
       >
         <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
@@ -174,7 +176,7 @@ export function Sidebar({
             onClick={onCreateTask}
             className={cn(
               "w-full bg-primary hover:bg-primary/90 text-primary-foreground",
-              collapsed && "px-2"
+              collapsed && "px-2",
             )}
           >
             <Plus className="h-4 w-4" />
@@ -184,37 +186,42 @@ export function Sidebar({
 
         <nav className="flex-1 px-3 py-2">
           <ul className="space-y-1">
-            {navItems.map((item) => (
-              <li key={item.id}>
-                <button
-                  onClick={() => {
-                    onViewChange(item.id);
-                    setMobileOpen(false);
-                  }}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
-                    activeView === item.id
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-                  )}
-                >
-                  <item.icon className="h-5 w-5 shrink-0" />
-                  {!collapsed && (
-                    <>
-                      <span className="flex-1 text-left">{item.label}</span>
-                      {item.badge !== undefined && item.badge > 0 && (
-                        <Badge
-                          variant="secondary"
-                          className="bg-primary text-primary-foreground text-xs px-1.5 py-0.5"
-                        >
-                          {item.badge}
-                        </Badge>
-                      )}
-                    </>
-                  )}
-                </button>
-              </li>
-            ))}
+            {navItems.map((item) => {
+              // Verifica se o usuário tem permissão para ver o Blog
+              if (item.id === "blog" && !isGestor) return null;
+
+              return (
+                <li key={item.id}>
+                  <button
+                    onClick={() => {
+                      onViewChange(item.id);
+                      setMobileOpen(false);
+                    }}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
+                      activeView === item.id
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                    )}
+                  >
+                    <item.icon className="h-5 w-5 shrink-0" />
+                    {!collapsed && (
+                      <>
+                        <span className="flex-1 text-left">{item.label}</span>
+                        {item.badge !== undefined && item.badge > 0 && (
+                          <Badge
+                            variant="secondary"
+                            className="bg-primary text-primary-foreground text-xs px-1.5 py-0.5"
+                          >
+                            {item.badge}
+                          </Badge>
+                        )}
+                      </>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </nav>
 
@@ -222,7 +229,7 @@ export function Sidebar({
           <div
             className={cn(
               "flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-sidebar-accent/50 cursor-pointer transition-colors",
-              collapsed && "justify-center px-0"
+              collapsed && "justify-center px-0",
             )}
           >
             <Avatar className="h-8 w-8">
@@ -256,7 +263,7 @@ export function Sidebar({
               activeView === "settings"
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
-              collapsed && "justify-center"
+              collapsed && "justify-center",
             )}
           >
             <Settings className="h-5 w-5" />
