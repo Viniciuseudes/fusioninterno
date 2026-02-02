@@ -20,7 +20,7 @@ import {
   Flame,
   Shield,
   DoorOpen,
-  BookOpen, // Novo ícone para o Blog
+  BookOpen, // Ícone do Blog
 } from "lucide-react";
 import { useUser } from "@/contexts/user-context";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -117,6 +117,9 @@ export function Sidebar({
     );
   }
 
+  // Verifica se é Gestor OU Admin
+  const isGestorOrAdmin = isGestor || currentUser.role === ("admin" as any);
+
   return (
     <>
       <Button
@@ -188,7 +191,8 @@ export function Sidebar({
           <ul className="space-y-1">
             {navItems.map((item) => {
               // Verifica se o usuário tem permissão para ver o Blog
-              if (item.id === "blog" && !isGestor) return null;
+              // Agora aceita ADMIN também
+              if (item.id === "blog" && !isGestorOrAdmin) return null;
 
               return (
                 <li key={item.id}>
@@ -245,10 +249,12 @@ export function Sidebar({
                   <p className="text-sm font-medium truncate">
                     {currentUser.name}
                   </p>
-                  {isGestor && <Shield className="h-3.5 w-3.5 text-primary" />}
+                  {isGestorOrAdmin && (
+                    <Shield className="h-3.5 w-3.5 text-primary" />
+                  )}
                 </div>
                 <p className="text-xs text-sidebar-foreground/60 truncate">
-                  {isGestor ? "Gestor" : "Membro"}
+                  {currentUser.role}
                 </p>
               </div>
             )}

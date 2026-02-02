@@ -13,6 +13,7 @@ import { TeamsView } from "@/components/teams-view";
 import { FullCalendarView } from "@/components/full-calendar-view";
 import { FindRoomView } from "@/components/find-room-view";
 import { SettingsView } from "@/components/settings-view";
+import { BlogView } from "@/components/blog-view"; // <--- NOVO IMPORT
 import { CreateTaskModal } from "@/components/create-task-modal";
 import { type Task, sampleProject, getFilteredTasks } from "@/lib/data";
 import { useUser } from "@/contexts/user-context";
@@ -109,8 +110,6 @@ export default function Home() {
   const handleCreateTask = async (newTask: Task) => {
     if (!currentUser) return;
 
-    // Optimistic add (se tiver ID temporário, senão espera o banco)
-    // Aqui optamos por esperar o retorno do banco para garantir integridade do ID
     try {
       const createdTask = await TaskService.createTask(newTask, currentUser.id);
       setTasks((prev) => [createdTask, ...prev]);
@@ -128,7 +127,13 @@ export default function Home() {
       );
     }
 
-    if (tasks.length === 0 && !isDataLoading) {
+    // Se não tiver tarefas, mas estivermos no blog, NÃO mostrar a mensagem vazia
+    // Apenas mostrar mensagem vazia se estiver no dashboard ou tasks e realmente vazio
+    if (
+      tasks.length === 0 &&
+      !isDataLoading &&
+      (activeView === "dashboard" || activeView === "tasks")
+    ) {
       return (
         <div className="flex flex-col items-center justify-center h-[400px] text-muted-foreground">
           <p>Nenhuma tarefa encontrada.</p>
@@ -181,6 +186,8 @@ export default function Home() {
         return <TeamsView />;
       case "rooms":
         return <FindRoomView />;
+      case "blog": // <--- ADICIONADO O CASE DO BLOG
+        return <BlogView />;
       case "settings":
         return <SettingsView />;
       default:

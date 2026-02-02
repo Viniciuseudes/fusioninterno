@@ -22,8 +22,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, ExternalLink, Loader2 } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast"; // Verifique se o caminho é hooks ou components/ui
+import { Plus, Pencil, Trash2, Loader2, AlertCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast"; // Ajuste o caminho conforme seu projeto
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,40 +36,34 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-export default function BlogListPage() {
+export function BlogView() {
   const { currentUser, isGestor, isLoading } = useUser();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const { toast } = useToast();
 
-  // CORREÇÃO: Permite acesso se for Gestor OU Admin
-  // O (as any) é para evitar erro de TypeScript caso sua tipagem não inclua 'admin' ainda
-  const hasAccess = isGestor || currentUser?.role === ("admin" as any);
+  const isGestorOrAdmin = isGestor || currentUser?.role === ("admin" as any);
 
   useEffect(() => {
     if (!isLoading) {
-      if (!currentUser || !hasAccess) {
-        toast({
-          title: "Acesso Negado",
-          description: "Apenas gestores podem acessar o blog.",
-          variant: "destructive",
-        });
-        router.push("/");
+      if (!isGestorOrAdmin) {
+        // Se não tiver permissão, exibe mensagem (opcional, pois a sidebar já bloqueia)
       } else {
         fetchPosts();
       }
     }
-  }, [currentUser, hasAccess, isLoading, router, toast]);
+  }, [currentUser, isGestorOrAdmin, isLoading]);
 
   const fetchPosts = async () => {
     try {
       const data = await blogService.getAllPosts();
       setPosts(data);
     } catch (error) {
+      console.error(error);
       toast({
         title: "Erro ao carregar posts",
-        description: "Verifique se a tabela 'posts' foi criada no Supabase.",
+        description: "Verifique a conexão ou se a tabela existe.",
         variant: "destructive",
       });
     } finally {
@@ -93,22 +87,28 @@ export default function BlogListPage() {
 
   if (loading || isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-full items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  // Se não tiver acesso, retorna nulo para não piscar a tela antes do redirect
-  if (!hasAccess) return null;
+  if (!isGestorOrAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[400px] text-muted-foreground gap-2">
+        <AlertCircle className="h-10 w-10 text-destructive" />
+        <p>Você não tem permissão para acessar este módulo.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gerenciar Blog</h1>
+          <h2 className="text-3xl font-bold tracking-tight">Blog</h2>
           <p className="text-muted-foreground">
-            Crie conteúdo para atrair mais clientes para a Fusion Clinic.
+            Gerencie as publicações do site principal.
           </p>
         </div>
         <Button asChild>
@@ -120,9 +120,9 @@ export default function BlogListPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Todos os Artigos</CardTitle>
+          <CardTitle>Artigos Publicados</CardTitle>
           <CardDescription>
-            Gerencie seus posts publicados e rascunhos.
+            Lista de todos os posts visíveis no site da Fusion Clinic.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -141,7 +141,7 @@ export default function BlogListPage() {
                 <TableRow key={post.id}>
                   <TableCell className="font-medium">
                     {post.title}
-                    <div className="text-xs text-muted-foreground truncate max-w-[300px]">
+                    <div className="text-xs text-muted-foreground truncate max-w-[250px]">
                       /{post.slug}
                     </div>
                   </TableCell>
@@ -150,8 +150,9 @@ export default function BlogListPage() {
                   </TableCell>
                   <TableCell>
                     <Badge
+                      variant={post.published ? "default" : "secondary"}
                       className={
-                        post.published ? "bg-green-500" : "bg-yellow-500"
+                        post.published ? "bg-green-600 hover:bg-green-700" : ""
                       }
                     >
                       {post.published ? "Publicado" : "Rascunho"}
@@ -160,54 +161,49 @@ export default function BlogListPage() {
                   <TableCell>
                     {new Date(post.created_at).toLocaleDateString("pt-BR")}
                   </TableCell>
-                  <TableCell className="text-right flex justify-end gap-2">
-                    <Button variant="ghost" size="icon" asChild>
-                      <Link href={`/blog/editor?id=${post.id}`}>
-                        <Pencil className="h-4 w-4 text-blue-500" />
-                      </Link>
-                    </Button>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button variant="ghost" size="icon" asChild>
+                        <Link href={`/blog/editor?id=${post.id}`}>
+                          <Pencil className="h-4 w-4 text-blue-500" />
+                        </Link>
+                      </Button>
 
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Esta ação não pode ser desfeita. O post será
-                            removido permanentemente.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-red-500 hover:bg-red-600"
-                            onClick={() => handleDelete(post.id)}
-                          >
-                            Excluir
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir artigo?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta ação removerá o post permanentemente do site.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive hover:bg-destructive/90"
+                              onClick={() => handleDelete(post.id)}
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
               {posts.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-10">
-                    <div className="flex flex-col items-center gap-2">
-                      <p className="text-muted-foreground">
-                        Nenhum post encontrado.
-                      </p>
-                      {/* Dica visual caso o banco esteja vazio */}
-                      <p className="text-xs text-muted-foreground opacity-50">
-                        (Se você acabou de criar a tabela, clique em "Novo
-                        Post")
-                      </p>
-                    </div>
+                  <TableCell
+                    colSpan={5}
+                    className="text-center py-10 text-muted-foreground"
+                  >
+                    Nenhum post encontrado.
                   </TableCell>
                 </TableRow>
               )}
