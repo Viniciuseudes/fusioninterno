@@ -9,7 +9,6 @@ const withPWA = withPWAInit({
   disable: process.env.NODE_ENV === "development", 
   workboxOptions: {
     disableDevLogs: true,
-    // 👇 Essa é a configuração que ignora as páginas de erro internas e resolve o crash
     exclude: [
       /_not-found$/,
       /404$/
