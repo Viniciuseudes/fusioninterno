@@ -6,7 +6,6 @@ const withPWA = withPWAInit({
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   swcMinify: true,
-  // Desabilita o PWA em desenvolvimento para não atrapalhar o hot-reload
   disable: process.env.NODE_ENV === "development", 
   workboxOptions: {
     disableDevLogs: true,
@@ -21,6 +20,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // 👇 Esta é a linha mágica que resolve o erro do Vercel
+  turbopack: {}, 
 };
 
 export default withPWA(nextConfig);
