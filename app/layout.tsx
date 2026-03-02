@@ -5,21 +5,24 @@ import { Analytics } from "@vercel/analytics/next";
 import { UserProvider } from "@/contexts/user-context";
 import "./globals.css";
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const _geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
+const _geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
+});
 
 export const metadata: Metadata = {
-  title: "Fusion Interno - Gestão de Tarefas Empresarial", // Corrigi o erro de digitação de Fucion para Fusion
+  title: "Fusion Interno - Gestão de Tarefas Empresarial",
   description:
     "Gerencie seus projetos, tarefas e colaboração da equipe em uma plataforma poderosa",
   generator: "Next.js",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent", // Deixa a barra de status do iPhone integrada ao app
+    statusBarStyle: "black-translucent",
     title: "Fusion",
   },
   formatDetection: {
-    telephone: false, // Evita que números pareçam links no iOS
+    telephone: false,
   },
   icons: {
     icon: [
@@ -44,6 +47,22 @@ export const viewport: Viewport = {
   themeColor: "#1a1625",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1, // Impede zoom que quebra o layout no mobile
+  maximumScale: 1,
   userScalable: false,
 };
+
+// 👇 A PARTE QUE ESTAVA FALTANDO 👇
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="pt-BR">
+      <body className={`${_geist.variable} ${_geistMono.variable} antialiased`}>
+        <UserProvider>{children}</UserProvider>
+        <Analytics />
+      </body>
+    </html>
+  );
+}
