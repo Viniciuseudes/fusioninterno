@@ -26,6 +26,7 @@ import { useUser } from "@/contexts/user-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TaskService } from "@/services/task-service";
 import { createClient } from "@/lib/supabase/client";
+import { CortisolButton } from "@/components/cortisol-button"; // <-- IMPORTAÇÃO ADICIONADA AQUI
 
 interface SidebarProps {
   activeView: string;
@@ -190,7 +191,7 @@ export function Sidebar({
         <nav className="flex-1 px-3 py-2">
           <ul className="space-y-1">
             {navItems.map((item) => {
-              // Verifica se o usuário tem permissão para ver o Blog
+              // Verifica se o utilizador tem permissão para ver o Blog
               // Agora aceita ADMIN também
               if (item.id === "blog" && !isGestorOrAdmin) return null;
 
@@ -232,33 +233,44 @@ export function Sidebar({
         <div className="border-t border-sidebar-border p-3">
           <div
             className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-sidebar-accent/50 cursor-pointer transition-colors",
+              "flex items-center justify-between px-3 py-2 rounded-lg hover:bg-sidebar-accent/50 transition-colors",
               collapsed && "justify-center px-0",
             )}
           >
-            <Avatar className="h-8 w-8">
-              <AvatarImage
-                src={currentUser.avatar || "/placeholder.svg"}
-                alt={currentUser.name}
-              />
-              <AvatarFallback>{currentUser.name.charAt(0)}</AvatarFallback>
-            </Avatar>
-            {!collapsed && (
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium truncate">
-                    {currentUser.name}
+            {/* Bloco do Avatar e Nome */}
+            <div className="flex items-center gap-3 min-w-0 cursor-pointer">
+              <Avatar className="h-8 w-8 shrink-0">
+                <AvatarImage
+                  src={currentUser.avatar || "/placeholder.svg"}
+                  alt={currentUser.name}
+                />
+                <AvatarFallback>{currentUser.name.charAt(0)}</AvatarFallback>
+              </Avatar>
+              {!collapsed && (
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium truncate">
+                      {currentUser.name}
+                    </p>
+                    {isGestorOrAdmin && (
+                      <Shield className="h-3.5 w-3.5 text-primary shrink-0" />
+                    )}
+                  </div>
+                  <p className="text-xs text-sidebar-foreground/60 truncate">
+                    {currentUser.role}
                   </p>
-                  {isGestorOrAdmin && (
-                    <Shield className="h-3.5 w-3.5 text-primary" />
-                  )}
                 </div>
-                <p className="text-xs text-sidebar-foreground/60 truncate">
-                  {currentUser.role}
-                </p>
+              )}
+            </div>
+
+            {/* 👇 BOTÃO DO CORTISOL AQUI 👇 */}
+            {!collapsed && (
+              <div className="shrink-0 scale-[0.8] origin-right">
+                <CortisolButton />
               </div>
             )}
           </div>
+
           <button
             onClick={() => {
               onViewChange("settings");
@@ -272,7 +284,7 @@ export function Sidebar({
               collapsed && "justify-center",
             )}
           >
-            <Settings className="h-5 w-5" />
+            <Settings className="h-5 w-5 shrink-0" />
             {!collapsed && <span>Configurações</span>}
           </button>
         </div>

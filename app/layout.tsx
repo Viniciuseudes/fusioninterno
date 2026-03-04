@@ -1,7 +1,7 @@
 import type React from "react";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
+import { Analytics } from "@vercel/analytics/react"; // <-- Importação corrigida aqui!
 import { UserProvider } from "@/contexts/user-context";
 import "./globals.css";
 
@@ -51,7 +51,6 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-// 👇 A PARTE QUE ESTAVA FALTANDO 👇
 export default function RootLayout({
   children,
 }: Readonly<{

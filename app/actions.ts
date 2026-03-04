@@ -77,3 +77,30 @@ export async function createUserWithPassword(data: {
     throw new Error(error.message || "Falha interna no servidor");
   }
 }
+
+// ==========================================
+// NOVAS ACTIONS DO CORTISOL (NOTIFICAÇÕES)
+// ==========================================
+
+export async function savePushSubscription(userId: string, subscription: any) {
+  console.log("A guardar a subscrição push para o utilizador:", userId);
+
+  try {
+    const { error } = await supabaseAdmin
+      .from('push_subscriptions')
+      .insert({
+        user_id: userId,
+        subscription: subscription
+      });
+
+    if (error) {
+      console.error("Erro ao guardar a subscrição no Supabase:", error);
+      throw new Error(`Erro na base de dados: ${error.message}`);
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("ERRO FINAL na Server Action (Push):", error);
+    return { error: error.message || "Falha interna no servidor ao ativar notificações" };
+  }
+}
