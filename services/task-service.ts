@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client"
 import { Task, User, Team, CalendarEvent } from "@/lib/data"
+import { Cortisol } from "@/services/cortisol-service" // <-- CORTISOL IMPORTADO AQUI
 
 const supabase = createClient()
 
@@ -154,19 +155,25 @@ export const TaskService = {
       }))
       await supabase.from('task_owners').insert(ownersData)
 
-      // Gera notificações
-      const notifications = task.owners
-        .filter(owner => owner.id !== creatorId)
-        .map(owner => ({
-          user_id: owner.id,
-          from_user_id: creatorId,
-          task_id: newTask.id,
-          type: 'assignment',
-          content: 'atribuiu uma tarefa para você'
-        }))
-      
-      if (notifications.length > 0) {
-        await supabase.from('notifications').insert(notifications)
+      // --- 🚨 GATILHO DO CORTISOL: NOVA TAREFA 🚨 ---
+      try {
+        const { data: creatorData } = await supabase.from('profiles').select('name').eq('id', creatorId).single();
+        const creatorName = creatorData?.name || "Um colega";
+
+        for (const owner of task.owners) {
+          if (owner.id !== creatorId) {
+            await Cortisol.notifyNewTask(
+              supabase,
+              owner.id,
+              creatorId,
+              newTask.id,
+              newTask.name,
+              creatorName
+            );
+          }
+        }
+      } catch (err) {
+        console.error("Erro no Cortisol ao criar tarefa:", err);
       }
     }
 
@@ -240,28 +247,28 @@ export const TaskService = {
 
     if (error) throw error
     
-    // Notifica outros participantes
-    const { data: owners } = await supabase
-      .from('task_owners')
-      .select('user_id')
-      .eq('task_id', taskId)
+    // --- 🚨 GATILHO DO CORTISOL: NOVO COMENTÁRIO 🚨 ---
+    try {
+      const { data: owners } = await supabase.from('task_owners').select('user_id').eq('task_id', taskId);
+      const { data: taskData } = await supabase.from('tasks').select('name').eq('id', taskId).single();
+      const { data: userData } = await supabase.from('profiles').select('name').eq('id', userId).single();
 
-    if (owners) {
-      const recipients = owners
-        .map(o => o.user_id)
-        .filter(id => id !== userId)
-      
-      const notifications = recipients.map(recipientId => ({
-        user_id: recipientId,
-        from_user_id: userId,
-        task_id: taskId,
-        type: 'comment',
-        content: type === 'audio' ? 'enviou um áudio' : type === 'image' ? 'enviou um anexo' : 'comentou na tarefa'
-      }))
-
-      if (notifications.length > 0) {
-        await supabase.from('notifications').insert(notifications)
+      if (owners && taskData && userData) {
+        for (const owner of owners) {
+          if (owner.user_id !== userId) {
+            await Cortisol.notifyNewComment(
+              supabase,
+              owner.user_id,
+              userId,
+              taskId,
+              taskData.name,
+              userData.name
+            );
+          }
+        }
       }
+    } catch (err) {
+      console.error("Erro no Cortisol ao enviar mensagem:", err);
     }
     
     return {
