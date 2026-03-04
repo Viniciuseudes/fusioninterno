@@ -21,12 +21,13 @@ import {
   Shield,
   DoorOpen,
   BookOpen, // Ícone do Blog
+  LogOut, // Ícone de Sair
 } from "lucide-react";
 import { useUser } from "@/contexts/user-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TaskService } from "@/services/task-service";
 import { createClient } from "@/lib/supabase/client";
-import { CortisolButton } from "@/components/cortisol-button"; // <-- IMPORTAÇÃO ADICIONADA AQUI
+import { CortisolButton } from "@/components/cortisol-button";
 
 interface SidebarProps {
   activeView: string;
@@ -43,7 +44,8 @@ export function Sidebar({
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { currentUser, isGestor, isLoading } = useUser();
+  // Puxando o signOut do contexto
+  const { currentUser, isGestor, isLoading, signOut } = useUser();
   const [unreadCount, setUnreadCount] = useState(0);
   const supabase = createClient();
 
@@ -286,6 +288,18 @@ export function Sidebar({
           >
             <Settings className="h-5 w-5 shrink-0" />
             {!collapsed && <span>Configurações</span>}
+          </button>
+
+          {/* 👇 BOTÃO DE SAIR AQUI 👇 */}
+          <button
+            onClick={signOut}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2.5 mt-1 rounded-lg transition-colors text-red-500 hover:bg-red-500/10 hover:text-red-600",
+              collapsed && "justify-center",
+            )}
+          >
+            <LogOut className="h-5 w-5 shrink-0" />
+            {!collapsed && <span>Sair da conta</span>}
           </button>
         </div>
       </aside>
