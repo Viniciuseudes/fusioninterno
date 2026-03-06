@@ -77,7 +77,7 @@ function FilterCombobox({
           aria-expanded={open}
           className="w-full justify-between bg-background border-input hover:bg-accent hover:text-accent-foreground h-10 px-3 py-2"
         >
-          <div className="flex items-center gap-2 truncate">
+          <div className="flex items-center gap-2 truncate min-w-0">
             <Icon className="h-4 w-4 shrink-0 opacity-50" />
             <span className="truncate text-muted-foreground font-normal">
               {value === "all" ? label : currentLabel}
@@ -89,7 +89,7 @@ function FilterCombobox({
       <PopoverContent className="w-[200px] p-0" align="start">
         <div className="p-2 border-b">
           <div className="flex items-center border rounded-md px-2 bg-muted/20">
-            <Search className="h-3 w-3 text-muted-foreground mr-2" />
+            <Search className="h-3 w-3 text-muted-foreground mr-2 shrink-0" />
             <input
               className="flex h-8 w-full rounded-md bg-transparent py-2 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
               placeholder="Buscar..."
@@ -103,7 +103,7 @@ function FilterCombobox({
             <div
               className={cn(
                 "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-                value === "all" && "bg-accent/50"
+                value === "all" && "bg-accent/50",
               )}
               onClick={() => {
                 onChange("all");
@@ -113,7 +113,7 @@ function FilterCombobox({
               <Check
                 className={cn(
                   "mr-2 h-4 w-4",
-                  value === "all" ? "opacity-100" : "opacity-0"
+                  value === "all" ? "opacity-100" : "opacity-0",
                 )}
               />
               Todos
@@ -131,7 +131,7 @@ function FilterCombobox({
                     key={option}
                     className={cn(
                       "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 cursor-pointer",
-                      isSelected && "bg-accent/50"
+                      isSelected && "bg-accent/50",
                     )}
                     onClick={() => {
                       onChange(option);
@@ -140,11 +140,11 @@ function FilterCombobox({
                   >
                     <Check
                       className={cn(
-                        "mr-2 h-4 w-4",
-                        isSelected ? "opacity-100" : "opacity-0"
+                        "mr-2 h-4 w-4 shrink-0",
+                        isSelected ? "opacity-100" : "opacity-0",
                       )}
                     />
-                    {optionLabel}
+                    <span className="truncate">{optionLabel}</span>
                   </div>
                 );
               })
@@ -231,7 +231,6 @@ export function FindRoomView() {
     return true;
   });
 
-  // Handlers
   const handleCreateRoom = () => {
     setRoomToEdit(null);
     setIsManageModalOpen(true);
@@ -257,24 +256,27 @@ export function FindRoomView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
+      {/* Adicionado flex-col no mobile para quebrar linha se necessário */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="w-full sm:w-auto">
           <h1 className="text-2xl font-bold">Encontre sua Sala</h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-sm sm:text-base">
             Gestão e busca de consultórios em todo o Brasil
           </p>
         </div>
 
         {isGestor && (
-          <Button onClick={handleCreateRoom} className="bg-primary shadow-md">
+          <Button
+            onClick={handleCreateRoom}
+            className="bg-primary shadow-md w-full sm:w-auto"
+          >
             <Plus className="h-4 w-4 mr-2" /> Cadastrar Sala
           </Button>
         )}
       </div>
 
-      <div className="bg-card p-6 rounded-xl border border-border shadow-sm space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          {/* Busca Textual */}
+      <div className="bg-card p-4 sm:p-6 rounded-xl border border-border shadow-sm space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
           <div className="relative lg:col-span-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -285,7 +287,6 @@ export function FindRoomView() {
             />
           </div>
 
-          {/* COMBOBOX DE LOCALIZAÇÃO */}
           <FilterCombobox
             label="Localização"
             icon={MapPin}
@@ -293,8 +294,6 @@ export function FindRoomView() {
             value={selectedNeighborhood}
             onChange={setSelectedNeighborhood}
           />
-
-          {/* COMBOBOX DE MODALIDADE */}
           <FilterCombobox
             label="Modalidade"
             icon={Filter}
@@ -303,8 +302,6 @@ export function FindRoomView() {
             onChange={(v) => setSelectedModality(v as any)}
             labels={modalityLabels}
           />
-
-          {/* COMBOBOX DE ESPECIALIDADE */}
           <FilterCombobox
             label="Especialidade"
             icon={Star}
@@ -313,8 +310,6 @@ export function FindRoomView() {
             onChange={(v) => setSelectedSpecialty(v as any)}
             labels={specialtyLabels}
           />
-
-          {/* COMBOBOX DE EQUIPAMENTO */}
           <FilterCombobox
             label="Equipamento"
             icon={Stethoscope}
@@ -328,7 +323,7 @@ export function FindRoomView() {
           selectedModality !== "all" ||
           selectedSpecialty !== "all" ||
           selectedEquipment !== "all") && (
-          <div className="flex justify-end">
+          <div className="flex justify-end mt-2">
             <Button
               variant="ghost"
               size="sm"
@@ -339,7 +334,7 @@ export function FindRoomView() {
                 setSelectedEquipment("all");
                 setSearchTerm("");
               }}
-              className="text-muted-foreground hover:text-destructive"
+              className="text-muted-foreground hover:text-destructive text-xs sm:text-sm"
             >
               Limpar Filtros
             </Button>
@@ -358,7 +353,7 @@ export function FindRoomView() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
           {filteredRooms.map((room) => (
             <RoomCard
               key={room.id}
@@ -432,7 +427,6 @@ function RoomCard({
         </div>
       )}
 
-      {/* ASPECT-RATIO 3/4 PARA FORMATO RETRATO (CELULAR) */}
       <div className="aspect-[3/4] relative overflow-hidden bg-muted">
         <img
           src={room.images[0] || "/placeholder.jpg"}
@@ -445,41 +439,41 @@ function RoomCard({
             <Badge
               key={mod}
               variant="secondary"
-              className="bg-white/90 text-black shadow-sm backdrop-blur-sm text-[10px] font-bold uppercase tracking-wide"
+              className="bg-white/90 text-black shadow-sm backdrop-blur-sm text-[10px] font-bold uppercase tracking-wide truncate max-w-[120px]"
             >
               {modalityLabels[mod]}
             </Badge>
           ))}
         </div>
         <div className="absolute bottom-3 left-3 right-3 text-white">
-          <h3 className="font-bold text-lg leading-tight shadow-black drop-shadow-md">
+          <h3 className="font-bold text-lg leading-tight shadow-black drop-shadow-md truncate">
             {room.name}
           </h3>
-          <p className="text-xs text-white/90 flex items-center gap-1 mt-1 drop-shadow-md">
-            <MapPin className="h-3 w-3" /> {room.neighborhood}
+          <p className="text-xs text-white/90 flex items-center gap-1 mt-1 drop-shadow-md truncate">
+            <MapPin className="h-3 w-3 shrink-0" />{" "}
+            <span className="truncate">{room.neighborhood}</span>
           </p>
         </div>
       </div>
 
-      <CardContent className="p-4 pt-4 flex-1 flex flex-col gap-3">
+      <CardContent className="p-4 pt-4 flex-1 flex flex-col gap-3 min-w-0">
         <div className="flex flex-wrap gap-1">
           {room.specialties.slice(0, 2).map((spec) => (
             <Badge
               key={spec}
               variant="outline"
-              className="text-[10px] border-primary/20 text-primary bg-primary/5"
+              className="text-[10px] border-primary/20 text-primary bg-primary/5 truncate max-w-[120px]"
             >
               {specialtyLabels[spec]}
             </Badge>
           ))}
           {room.specialties.length > 2 && (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-[10px] shrink-0">
               +{room.specialties.length - 2}
             </Badge>
           )}
         </div>
 
-        {/* EXIBIÇÃO INTELIGENTE: REFERÊNCIA OU EQUIPAMENTOS */}
         <div className="space-y-1.5 pt-1">
           {room.referencePoint ? (
             <p className="text-xs text-muted-foreground flex items-start gap-1">
@@ -501,20 +495,24 @@ function RoomCard({
       </CardContent>
 
       <CardFooter className="p-4 pt-0 mt-auto border-t bg-muted/5">
-        <div className="w-full flex items-center justify-between pt-3">
-          <div>
-            <p className="font-bold text-lg text-primary">
+        <div className="w-full flex items-center justify-between pt-3 gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="font-bold text-base sm:text-lg text-primary truncate">
               R$ {room.pricePerHour || room.pricePerShift || room.priceFixed}
-              <span className="text-xs font-normal text-muted-foreground ml-1">
+              <span className="text-[10px] sm:text-xs font-normal text-muted-foreground ml-1">
                 {room.pricePerHour
                   ? "/h"
                   : room.pricePerShift
-                  ? "/turno"
-                  : "/mês"}
+                    ? "/turno"
+                    : "/mês"}
               </span>
             </p>
           </div>
-          <Button size="sm" variant="secondary" className="h-8">
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-8 shrink-0 text-xs px-2 sm:px-3"
+          >
             Ver Detalhes
           </Button>
         </div>

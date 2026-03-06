@@ -13,7 +13,7 @@ import { TeamsView } from "@/components/teams-view";
 import { FullCalendarView } from "@/components/full-calendar-view";
 import { FindRoomView } from "@/components/find-room-view";
 import { SettingsView } from "@/components/settings-view";
-import { BlogView } from "@/components/blog-view"; // <--- NOVO IMPORT
+import { BlogView } from "@/components/blog-view";
 import { CreateTaskModal } from "@/components/create-task-modal";
 import { type Task, sampleProject, getFilteredTasks } from "@/lib/data";
 import { useUser } from "@/contexts/user-context";
@@ -127,8 +127,6 @@ export default function Home() {
       );
     }
 
-    // Se não tiver tarefas, mas estivermos no blog, NÃO mostrar a mensagem vazia
-    // Apenas mostrar mensagem vazia se estiver no dashboard ou tasks e realmente vazio
     if (
       tasks.length === 0 &&
       !isDataLoading &&
@@ -186,7 +184,7 @@ export default function Home() {
         return <TeamsView />;
       case "rooms":
         return <FindRoomView />;
-      case "blog": // <--- ADICIONADO O CASE DO BLOG
+      case "blog":
         return <BlogView />;
       case "settings":
         return <SettingsView />;
@@ -214,7 +212,10 @@ export default function Home() {
       />
 
       <main className="flex-1 overflow-y-auto bg-background">
-        <div className="p-6 md:p-8 space-y-6">{renderContent()}</div>
+        {/* 👇 AQUI ESTÁ A MÁGICA: pt-16 no mobile, md:pt-8 no desktop 👇 */}
+        <div className="p-4 pt-16 md:p-8 md:pt-8 space-y-6">
+          {renderContent()}
+        </div>
       </main>
 
       {selectedTask && (
