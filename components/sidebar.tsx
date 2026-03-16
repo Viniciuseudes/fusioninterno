@@ -20,8 +20,9 @@ import {
   Flame,
   Shield,
   DoorOpen,
-  BookOpen, // Ícone do Blog
-  LogOut, // Ícone de Sair
+  BookOpen,
+  LogOut,
+  UserCheck, // Ícone adicionado para os Fusion Members
 } from "lucide-react";
 import { useUser } from "@/contexts/user-context";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -44,7 +45,6 @@ export function Sidebar({
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  // Puxando o signOut do contexto
   const { currentUser, isGestor, isLoading, signOut } = useUser();
   const [unreadCount, setUnreadCount] = useState(0);
   const supabase = createClient();
@@ -96,7 +96,8 @@ export function Sidebar({
     { id: "calendar", label: "Calendário", icon: Calendar },
     { id: "teams", label: "Equipes", icon: Users },
     { id: "rooms", label: "Encontre uma Sala", icon: DoorOpen },
-    { id: "blog", label: "Blog", icon: BookOpen }, // Item do Blog
+    { id: "fusion-members", label: "Fusion Members", icon: UserCheck }, // Nova Aba
+    { id: "blog", label: "Blog", icon: BookOpen },
   ];
 
   if (isLoading || !currentUser) {
@@ -120,7 +121,6 @@ export function Sidebar({
     );
   }
 
-  // Verifica se é Gestor OU Admin
   const isGestorOrAdmin = isGestor || currentUser.role === ("admin" as any);
 
   return (
@@ -193,9 +193,12 @@ export function Sidebar({
         <nav className="flex-1 px-3 py-2">
           <ul className="space-y-1">
             {navItems.map((item) => {
-              // Verifica se o utilizador tem permissão para ver o Blog
-              // Agora aceita ADMIN também
-              if (item.id === "blog" && !isGestorOrAdmin) return null;
+              // Bloqueia o acesso ao Blog e ao Fusion Members para utilizadores comuns
+              if (
+                (item.id === "blog" || item.id === "fusion-members") &&
+                !isGestorOrAdmin
+              )
+                return null;
 
               return (
                 <li key={item.id}>
@@ -239,7 +242,6 @@ export function Sidebar({
               collapsed && "justify-center px-0",
             )}
           >
-            {/* Bloco do Avatar e Nome */}
             <div className="flex items-center gap-3 min-w-0 cursor-pointer">
               <Avatar className="h-8 w-8 shrink-0">
                 <AvatarImage
@@ -265,7 +267,6 @@ export function Sidebar({
               )}
             </div>
 
-            {/* 👇 BOTÃO DO CORTISOL AQUI 👇 */}
             {!collapsed && (
               <div className="shrink-0 scale-[0.8] origin-right">
                 <CortisolButton />
@@ -290,7 +291,6 @@ export function Sidebar({
             {!collapsed && <span>Configurações</span>}
           </button>
 
-          {/* 👇 BOTÃO DE SAIR AQUI 👇 */}
           <button
             onClick={signOut}
             className={cn(

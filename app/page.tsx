@@ -14,6 +14,7 @@ import { FullCalendarView } from "@/components/full-calendar-view";
 import { FindRoomView } from "@/components/find-room-view";
 import { SettingsView } from "@/components/settings-view";
 import { BlogView } from "@/components/blog-view";
+import { FusionMembersView } from "@/components/fusion-members-view"; // 👈 IMPORTAÇÃO ADICIONADA AQUI
 import { CreateTaskModal } from "@/components/create-task-modal";
 import { type Task, sampleProject, getFilteredTasks } from "@/lib/data";
 import { useUser } from "@/contexts/user-context";
@@ -127,6 +128,7 @@ export default function Home() {
       );
     }
 
+    // Apenas mostrar "Nenhuma tarefa" se estivermos numa view relacionada com tarefas
     if (
       tasks.length === 0 &&
       !isDataLoading &&
@@ -184,6 +186,8 @@ export default function Home() {
         return <TeamsView />;
       case "rooms":
         return <FindRoomView />;
+      case "fusion-members": // 👈 NOVA ROTA ADICIONADA AQUI
+        return <FusionMembersView />;
       case "blog":
         return <BlogView />;
       case "settings":
