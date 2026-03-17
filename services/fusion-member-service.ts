@@ -17,9 +17,18 @@ export interface FusionMember {
   created_at?: string;
 }
 
+export interface FusionMemberUsage {
+  id: string;
+  member_id: string;
+  hours_deducted: number;
+  usage_date: string;
+  notes: string;
+  created_at?: string;
+}
+
 export const FusionMemberService = {
   async getMembers(): Promise<FusionMember[]> {
-    const supabase = createClient(); // Instanciado dentro da função
+    const supabase = createClient();
     const { data, error } = await supabase
       .from('fusion_members')
       .select('*')
@@ -30,7 +39,7 @@ export const FusionMemberService = {
   },
 
   async createMember(memberData: Omit<FusionMember, 'id' | 'hours_used' | 'status' | 'created_at'>): Promise<FusionMember> {
-    const supabase = createClient(); // Instanciado dentro da função
+    const supabase = createClient();
     const { data, error } = await supabase
       .from('fusion_members')
       .insert([{
@@ -46,7 +55,7 @@ export const FusionMemberService = {
   },
 
   async deleteMember(id: string): Promise<void> {
-    const supabase = createClient(); // Instanciado dentro da função
+    const supabase = createClient();
     const { error } = await supabase
       .from('fusion_members')
       .delete()
@@ -55,8 +64,24 @@ export const FusionMemberService = {
     if (error) throw new Error(error.message);
   },
 
-  async deductHours(memberId: string, hoursToDeduct: number): Promise<FusionMember> {
-    const supabase = createClient(); // Instanciado dentro da função
+  // NOVO: Busca o histórico de um membro
+  async getMemberUsage(memberId: string): Promise<FusionMemberUsage[]> {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('fusion_member_usage')
+      .select('*')
+      .eq('member_id', memberId)
+      .order('usage_date', { ascending: false });
+
+    if (error) throw new Error(error.message);
+    return data || [];
+  },
+
+  // ATUALIZADO: Deduz as horas E cria o registo de histórico
+  async deductHours(memberId: string, hoursToDeduct: number, usageDate: string, notes: string): Promise<FusionMember> {
+    const supabase = createClient();
+    
+    // 1. Pega as horas atuais
     const { data: member, error: fetchError } = await supabase
       .from('fusion_members')
       .select('hours_used, package_type')
@@ -65,13 +90,14 @@ export const FusionMemberService = {
 
     if (fetchError) throw new Error(fetchError.message);
 
-    const newHoursUsed = Number(member.hours_used) + hoursToDeduct;
+    const newHoursUsed = Number(member.hours_used) + Number(hoursToDeduct);
 
     if (newHoursUsed > member.package_type) {
       throw new Error('Horas insuficientes no pacote deste assinante.');
     }
 
-    const { data, error: updateError } = await supabase
+    // 2. Atualiza o total de horas na tabela principal
+    const { data: updatedMember, error: updateError } = await supabase
       .from('fusion_members')
       .update({ hours_used: newHoursUsed })
       .eq('id', memberId)
@@ -79,6 +105,22 @@ export const FusionMemberService = {
       .single();
 
     if (updateError) throw new Error(updateError.message);
-    return data;
+
+    // 3. Insere o registo na tabela de histórico
+    const { error: historyError } = await supabase
+      .from('fusion_member_usage')
+      .insert([{
+        member_id: memberId,
+        hours_deducted: hoursToDeduct,
+        usage_date: usageDate,
+        notes: notes
+      }]);
+
+    if (historyError) {
+      console.error("Erro ao salvar histórico:", historyError);
+      // Não quebramos a função principal se o histórico falhar, mas logamos o erro
+    }
+
+    return updatedMember;
   }
 };
