@@ -1,27 +1,21 @@
-import webpush from 'web-push';
 import { SupabaseClient } from '@supabase/supabase-js';
 
-webpush.setVapidDetails(
-  'mailto:contato@fusioninterno.com.br',
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
-
-// Função interna auxiliar para disparar o Push para todos os aparelhos
+// Função auxiliar para delegar o disparo do Web Push para uma rota de API (Server-Side)
 async function dispararPush(supabase: SupabaseClient, userId: string, title: string, body: string, url: string) {
-  const { data: subs } = await supabase.from('push_subscriptions').select('subscription').eq('user_id', userId);
-  
-  if (subs && subs.length > 0) {
-    const payload = JSON.stringify({ title, body, url });
-    const pushPromises = subs.map(sub =>
-      webpush.sendNotification(sub.subscription, payload).catch(err => console.error("Erro Push:", err))
-    );
-    await Promise.all(pushPromises);
+  try {
+    // Aqui chamamos uma API route que irá executar a biblioteca 'web-push' no servidor
+    await fetch('/api/push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, title, body, url }),
+    });
+  } catch (err) {
+    console.error("Erro ao chamar a API de Push:", err);
   }
 }
 
 export const Cortisol = {
-  // 1. NOVA TAREFA (O que já tínhamos)
+  // 1. NOVA TAREFA
   async notifyNewTask(supabase: SupabaseClient, assignedUserId: string, fromUserId: string, taskId: string, taskName: string, assignerName: string) {
     if (assignedUserId === fromUserId) return;
 
@@ -36,7 +30,7 @@ export const Cortisol = {
 
   // 2. NOVO COMENTÁRIO NA TAREFA
   async notifyNewComment(supabase: SupabaseClient, taskOwnerId: string, commenterId: string, taskId: string, taskName: string, commenterName: string) {
-    if (taskOwnerId === commenterId) return; // Não notifica se fui eu que comentei
+    if (taskOwnerId === commenterId) return;
 
     const content = `${commenterName} mandou mensagem na tarefa "${taskName}". Vai lá responder antes que acumule! 💬`;
 
@@ -47,7 +41,7 @@ export const Cortisol = {
     await dispararPush(supabase, taskOwnerId, '💬 Nova Mensagem', content, `/`);
   },
 
-  // 3. TAREFA VENCE HOJE (Aviso do Cron)
+  // 3. TAREFA VENCE HOJE
   async notifyDueToday(supabase: SupabaseClient, userId: string, taskId: string, taskName: string) {
     const content = `Atenção! A tarefa "${taskName}" vence HOJE. Mexa-se! 🏃‍♂️💨`;
 
@@ -55,18 +49,17 @@ export const Cortisol = {
       user_id: userId, task_id: taskId, type: 'deadline', content, read: false
     });
 
-    // Cortisol coloca uma mensagem dentro da própria tarefa (Chat) simulando um Bot!
     await supabase.from('task_messages').insert({
       task_id: taskId,
       content: `🤖 *Cortisol Bot:* Pessoal, passando para lembrar que esta tarefa VENCE HOJE! Não me decepcionem.`,
       type: 'text',
-      user_id: null // Se o seu BD permitir null, ele aparece como sistema
+      user_id: null 
     });
 
     await dispararPush(supabase, userId, '⏰ Prazo Esgotando!', content, `/`);
   },
 
-  // 4. TAREFA ATRASADA (Aviso do Cron)
+  // 4. TAREFA ATRASADA
   async notifyOverdue(supabase: SupabaseClient, userId: string, taskId: string, taskName: string) {
     const content = `Péssimas notícias! A tarefa "${taskName}" ESTÁ ATRASADA. O chefe já sabe? 🚨`;
 
