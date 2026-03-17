@@ -1,3 +1,5 @@
+"use client";
+
 import { createClient } from '@/lib/supabase/client';
 
 export type PackageType = 6 | 10 | 15 | 20;
@@ -15,11 +17,9 @@ export interface FusionMember {
   created_at?: string;
 }
 
-// Criamos a instância do cliente do Supabase logo no topo do serviço
-const supabase = createClient();
-
 export const FusionMemberService = {
   async getMembers(): Promise<FusionMember[]> {
+    const supabase = createClient(); // Instanciado dentro da função
     const { data, error } = await supabase
       .from('fusion_members')
       .select('*')
@@ -30,6 +30,7 @@ export const FusionMemberService = {
   },
 
   async createMember(memberData: Omit<FusionMember, 'id' | 'hours_used' | 'status' | 'created_at'>): Promise<FusionMember> {
+    const supabase = createClient(); // Instanciado dentro da função
     const { data, error } = await supabase
       .from('fusion_members')
       .insert([{
@@ -45,6 +46,7 @@ export const FusionMemberService = {
   },
 
   async deleteMember(id: string): Promise<void> {
+    const supabase = createClient(); // Instanciado dentro da função
     const { error } = await supabase
       .from('fusion_members')
       .delete()
@@ -53,8 +55,8 @@ export const FusionMemberService = {
     if (error) throw new Error(error.message);
   },
 
-  // Função para usar no momento em que o profissional agenda uma sala
   async deductHours(memberId: string, hoursToDeduct: number): Promise<FusionMember> {
+    const supabase = createClient(); // Instanciado dentro da função
     const { data: member, error: fetchError } = await supabase
       .from('fusion_members')
       .select('hours_used, package_type')
