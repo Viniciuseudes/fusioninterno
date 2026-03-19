@@ -45,6 +45,7 @@ import {
   Edit2,
   Check,
   X,
+  MoreVertical,
 } from "lucide-react";
 import {
   FusionMemberService,
@@ -52,6 +53,12 @@ import {
   FusionMemberUsage,
 } from "@/services/fusion-member-service";
 import { useToast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"; // 👇 Adicione esta importação no topo
 
 export function FusionMembersView() {
   const [members, setMembers] = useState<FusionMember[]>([]);
@@ -447,7 +454,7 @@ export function FusionMembersView() {
             return (
               <Card
                 key={member.id}
-                className="flex flex-col border-l-4 shadow-sm hover:shadow-md transition-shadow"
+                className="flex flex-col border-l-4 shadow-sm hover:shadow-md transition-shadow relative"
                 style={{
                   borderLeftColor:
                     status === "underutilized"
@@ -457,41 +464,50 @@ export function FusionMembersView() {
                         : "#10b981",
                 }}
               >
-                <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start">
-                    <div className="overflow-hidden">
-                      <CardTitle className="text-base font-bold flex items-center gap-2 truncate">
-                        <User className="h-4 w-4 shrink-0 text-muted-foreground" />{" "}
-                        {member.name}
-                      </CardTitle>
-                      <CardDescription className="flex items-center gap-1 mt-1 text-xs">
-                        <CreditCard className="h-3 w-3" />{" "}
-                        {member.payment_method}
-                      </CardDescription>
-                    </div>
-                    <div className="flex gap-1 shrink-0 ml-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-blue-500 hover:text-blue-700 hover:bg-blue-50/50"
-                        onClick={() => handleOpenHistory(member)}
-                      >
-                        <History className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-red-400 hover:text-red-600 hover:bg-red-50/50"
-                        onClick={() => handleDelete(member.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                {/* 👇 DESIGN UI/UX: Header com Dropdown Inteligente 👇 */}
+                <CardHeader className="pb-3 pt-5 relative">
+                  {/* Botão de Menu Flutuante (3 pontinhos) para responsividade */}
+                  <div className="absolute top-2 right-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-muted-foreground hover:bg-muted"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                          <span className="sr-only">Abrir menu</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuItem
+                          onClick={() => handleOpenHistory(member)}
+                          className="cursor-pointer text-blue-600 focus:text-blue-700"
+                        >
+                          <History className="mr-2 h-4 w-4" /> Ver Histórico
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleDelete(member.id)}
+                          className="cursor-pointer text-red-600 focus:text-red-700"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" /> Excluir Membro
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+
+                  <div className="flex flex-col mt-2">
+                    <CardTitle className="text-base font-bold flex items-center gap-2 pr-6">
+                      <User className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{member.name}</span>
+                    </CardTitle>
+                    <CardDescription className="flex items-center gap-1 mt-1.5 text-xs">
+                      <CreditCard className="h-3 w-3 text-muted-foreground/70" />{" "}
+                      {member.payment_method}
+                    </CardDescription>
                   </div>
                 </CardHeader>
 
                 <CardContent className="flex-1 pb-4">
-                  {/* 👇 DESIGN UI/UX PREMIUM PARA O SALDO 👇 */}
                   <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg mb-5 border border-border/50">
                     <div className="flex flex-col items-start">
                       <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider mb-0.5">
