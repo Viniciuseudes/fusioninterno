@@ -61,7 +61,6 @@ export function FusionMembersView() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const { toast } = useToast();
 
-  // Estados do Uso / Histórico
   const [selectedMemberForUsage, setSelectedMemberForUsage] =
     useState<FusionMember | null>(null);
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
@@ -77,7 +76,6 @@ export function FusionMembersView() {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
-  // Estados para Edição de Histórico
   const [editingUsageId, setEditingUsageId] = useState<string | null>(null);
   const [editUsageData, setEditUsageData] = useState({
     hours: "",
@@ -97,12 +95,11 @@ export function FusionMembersView() {
   const loadMembers = async () => {
     try {
       setIsLoading(true);
-      const data = await FusionMemberService.getMembers();
-      setMembers(data);
+      setMembers(await FusionMemberService.getMembers());
     } catch (error: any) {
       toast({
         title: "Erro",
-        description: "Não foi possível carregar os membros.",
+        description: "Erro ao carregar.",
         variant: "destructive",
       });
     } finally {
@@ -126,7 +123,6 @@ export function FusionMembersView() {
       const start = new Date(formData.start_date);
       const end = new Date(start);
       end.setDate(end.getDate() + 30);
-
       await FusionMemberService.createMember({
         name: formData.name,
         phone: formData.phone,
@@ -135,7 +131,6 @@ export function FusionMembersView() {
         end_date: end.toISOString().split("T")[0],
         payment_method: formData.payment_method,
       });
-
       toast({ title: "Sucesso!", description: "Assinatura cadastrada." });
       setIsAddModalOpen(false);
       setFormData({ ...formData, name: "", phone: "" });
@@ -155,10 +150,7 @@ export function FusionMembersView() {
     if (confirm("Tem certeza que deseja excluir esta assinatura?")) {
       try {
         await FusionMemberService.deleteMember(id);
-        toast({
-          title: "Excluído",
-          description: "Membro removido com sucesso.",
-        });
+        toast({ title: "Excluído", description: "Membro removido." });
         loadMembers();
       } catch (error: any) {
         toast({
@@ -185,10 +177,7 @@ export function FusionMembersView() {
         usageData.date,
         usageData.notes,
       );
-      toast({
-        title: "Sucesso",
-        description: "Horas descontadas com sucesso.",
-      });
+      toast({ title: "Sucesso", description: "Horas descontadas." });
       setIsUsageModalOpen(false);
       setUsageData({
         hours: "",
@@ -207,19 +196,17 @@ export function FusionMembersView() {
     }
   };
 
-  // --- Lógicas de Edição do Histórico ---
   const handleOpenHistory = async (member: FusionMember) => {
     setSelectedMemberHistory(member);
     setIsHistoryModalOpen(true);
     setIsLoadingHistory(true);
     setEditingUsageId(null);
     try {
-      const records = await FusionMemberService.getMemberUsage(member.id);
-      setHistoryRecords(records);
+      setHistoryRecords(await FusionMemberService.getMemberUsage(member.id));
     } catch (error) {
       toast({
         title: "Erro",
-        description: "Não foi possível carregar o histórico.",
+        description: "Erro ao carregar histórico.",
         variant: "destructive",
       });
     } finally {
@@ -249,16 +236,12 @@ export function FusionMembersView() {
         editUsageData.date,
         editUsageData.notes,
       );
-      toast({
-        title: "Atualizado",
-        description: "Registro de horas corrigido.",
-      });
+      toast({ title: "Atualizado", description: "Registro corrigido." });
       setEditingUsageId(null);
-      loadMembers(); // Recarrega os totais no fundo
-      const records = await FusionMemberService.getMemberUsage(
-        selectedMemberHistory.id,
+      loadMembers();
+      setHistoryRecords(
+        await FusionMemberService.getMemberUsage(selectedMemberHistory.id),
       );
-      setHistoryRecords(records);
     } catch (error: any) {
       toast({
         title: "Erro",
@@ -272,11 +255,7 @@ export function FusionMembersView() {
 
   const handleDeleteRecord = async (record: FusionMemberUsage) => {
     if (!selectedMemberHistory) return;
-    if (
-      confirm(
-        `Tem certeza que deseja apagar este uso de ${record.hours_deducted}h? O saldo retornará para o cliente.`,
-      )
-    ) {
+    if (confirm(`Estornar ${record.hours_deducted}h para o cliente?`)) {
       try {
         setIsLoadingHistory(true);
         await FusionMemberService.deleteUsage(
@@ -284,15 +263,11 @@ export function FusionMembersView() {
           selectedMemberHistory.id,
           Number(record.hours_deducted),
         );
-        toast({
-          title: "Estornado",
-          description: "Horas devolvidas com sucesso.",
-        });
+        toast({ title: "Estornado", description: "Horas devolvidas." });
         loadMembers();
-        const records = await FusionMemberService.getMemberUsage(
-          selectedMemberHistory.id,
+        setHistoryRecords(
+          await FusionMemberService.getMemberUsage(selectedMemberHistory.id),
         );
-        setHistoryRecords(records);
       } catch (error: any) {
         toast({
           title: "Erro",
@@ -356,7 +331,6 @@ export function FusionMembersView() {
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
-            {/* Conteúdo do modal de adição omitido por brevidade - Mantido do anterior */}
             <DialogHeader>
               <DialogTitle>Novo Fusion Member</DialogTitle>
             </DialogHeader>
@@ -473,7 +447,7 @@ export function FusionMembersView() {
             return (
               <Card
                 key={member.id}
-                className="flex flex-col border-l-4 shadow-sm"
+                className="flex flex-col border-l-4 shadow-sm hover:shadow-md transition-shadow"
                 style={{
                   borderLeftColor:
                     status === "underutilized"
@@ -483,108 +457,109 @@ export function FusionMembersView() {
                         : "#10b981",
                 }}
               >
-                <CardHeader className="pb-2">
+                <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />{" "}
+                    <div className="overflow-hidden">
+                      <CardTitle className="text-base font-bold flex items-center gap-2 truncate">
+                        <User className="h-4 w-4 shrink-0 text-muted-foreground" />{" "}
                         {member.name}
                       </CardTitle>
-                      <CardDescription className="flex items-center gap-1 mt-1">
+                      <CardDescription className="flex items-center gap-1 mt-1 text-xs">
                         <CreditCard className="h-3 w-3" />{" "}
                         {member.payment_method}
                       </CardDescription>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
-                          onClick={() => handleOpenHistory(member)}
-                        >
-                          <History className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-red-400 hover:text-red-600 hover:bg-red-50"
-                          onClick={() => handleDelete(member.id)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
+                    <div className="flex gap-1 shrink-0 ml-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-blue-500 hover:text-blue-700 hover:bg-blue-50/50"
+                        onClick={() => handleOpenHistory(member)}
+                      >
+                        <History className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-red-400 hover:text-red-600 hover:bg-red-50/50"
+                        onClick={() => handleDelete(member.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 </CardHeader>
 
                 <CardContent className="flex-1 pb-4">
-                  {/* 👇 DESTAQUE DO SALDO DE HORAS 👇 */}
-                  <div className="flex items-center justify-between bg-primary/5 dark:bg-primary/10 p-4 rounded-xl border border-primary/10 mb-4 mt-2">
-                    <div>
-                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-1">
-                        Saldo Disponível
-                      </p>
-                      <div className="text-3xl font-black text-primary leading-none">
-                        {remainingHours}
-                        <span className="text-lg text-primary/70">h</span>
-                      </div>
+                  {/* 👇 DESIGN UI/UX PREMIUM PARA O SALDO 👇 */}
+                  <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg mb-5 border border-border/50">
+                    <div className="flex flex-col items-start">
+                      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider mb-0.5">
+                        Total
+                      </span>
+                      <span className="text-sm font-semibold">
+                        {member.package_type}h
+                      </span>
                     </div>
-                    <div className="text-right flex flex-col items-end">
-                      <Badge
-                        variant="outline"
-                        className="mb-1 font-bold bg-background"
-                      >
-                        {member.package_type}H TOTAIS
-                      </Badge>
-                      <p className="text-xs text-muted-foreground font-medium">
-                        Usou {member.hours_used}h
-                      </p>
+                    <div className="h-8 w-px bg-border/60"></div>
+                    <div className="flex flex-col items-center">
+                      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider mb-0.5">
+                        Uso
+                      </span>
+                      <span className="text-sm font-semibold text-muted-foreground">
+                        {member.hours_used}h
+                      </span>
+                    </div>
+                    <div className="h-8 w-px bg-border/60"></div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] uppercase font-bold text-primary tracking-wider mb-0.5">
+                        Restante
+                      </span>
+                      <span className="text-xl font-black text-primary leading-none">
+                        {remainingHours}h
+                      </span>
                     </div>
                   </div>
 
                   {status === "underutilized" && (
-                    <div className="mb-4 flex items-center gap-2 text-xs text-amber-600 bg-amber-50 p-2 rounded-md border border-amber-200">
+                    <div className="mb-4 flex items-center gap-2 text-xs text-amber-600 bg-amber-50/80 p-2.5 rounded-md border border-amber-200/50">
                       <AlertCircle className="h-4 w-4 shrink-0" />
                       <span>Uso baixo. Sugira um agendamento!</span>
                     </div>
                   )}
                   {status === "expiring" && (
-                    <div className="mb-4 flex items-center gap-2 text-xs text-red-600 bg-red-50 p-2 rounded-md border border-red-200">
+                    <div className="mb-4 flex items-center gap-2 text-xs text-red-600 bg-red-50/80 p-2.5 rounded-md border border-red-200/50">
                       <CalendarClock className="h-4 w-4 shrink-0" />
                       <span>Atenção: Expira em {daysRemaining} dias.</span>
                     </div>
                   )}
 
-                  <div className="space-y-4 mt-2">
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground font-medium">
                           Progresso do Uso
                         </span>
-                        <span className="font-medium">
+                        <span className="font-semibold">
                           {usageProgress.toFixed(0)}%
                         </span>
                       </div>
-                      <Progress value={usageProgress} className="h-2" />
+                      <Progress value={usageProgress} className="h-1.5" />
                     </div>
 
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">
-                          Tempo Restante
-                        </span>
-                        <span className="font-medium text-xs">
-                          {daysRemaining} dias
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground font-medium">
+                          Validade ({daysRemaining} dias restantes)
                         </span>
                       </div>
-                      <div className="w-full bg-secondary rounded-full h-1.5 mt-1 overflow-hidden">
+                      <div className="w-full bg-secondary rounded-full h-1.5 overflow-hidden">
                         <div
-                          className="bg-slate-400 h-1.5 rounded-full"
+                          className="bg-slate-400 h-full rounded-full transition-all"
                           style={{ width: `${timeProgress}%` }}
                         />
                       </div>
-                      <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <div className="flex justify-between text-[10px] text-muted-foreground/80 font-medium pt-0.5">
                         <span>
                           {new Date(member.start_date).toLocaleDateString(
                             "pt-BR",
@@ -604,7 +579,7 @@ export function FusionMembersView() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-1 text-xs"
+                    className="flex-1 text-xs h-9 bg-transparent"
                     onClick={() =>
                       window.open(
                         `https://wa.me/55${member.phone.replace(/\D/g, "")}?text=Olá Dr(a). ${member.name.split(" ")[0]}, tudo bem? Vi que você tem ${remainingHours}h de saldo no seu pacote Fusion...`,
@@ -612,18 +587,18 @@ export function FusionMembersView() {
                       )
                     }
                   >
-                    <Phone className="h-3 w-3 mr-1.5 text-green-600" /> Cobrar
+                    <Phone className="h-3 w-3 mr-1.5 text-green-600" /> WhatsApp
                   </Button>
                   <Button
                     variant="default"
                     size="sm"
-                    className="flex-1 text-xs bg-slate-800 hover:bg-slate-700"
+                    className="flex-1 text-xs h-9 shadow-sm"
                     onClick={() => {
                       setSelectedMemberForUsage(member);
                       setIsUsageModalOpen(true);
                     }}
                   >
-                    <MinusCircle className="h-3 w-3 mr-1.5" /> Usar Horas
+                    <MinusCircle className="h-3.5 w-3.5 mr-1.5" /> Usar Horas
                   </Button>
                 </CardFooter>
               </Card>
@@ -632,7 +607,7 @@ export function FusionMembersView() {
         </div>
       )}
 
-      {/* MODAL DE USO Omitido para não ficar gigante, se mantém igual ao anterior */}
+      {/* MODAL DE USO */}
       <Dialog open={isUsageModalOpen} onOpenChange={setIsUsageModalOpen}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
@@ -683,7 +658,7 @@ export function FusionMembersView() {
         </DialogContent>
       </Dialog>
 
-      {/* 👇 NOVO MODAL: HISTÓRICO COM EDIÇÃO E ESTORNO 👇 */}
+      {/* MODAL HISTÓRICO */}
       <Dialog open={isHistoryModalOpen} onOpenChange={setIsHistoryModalOpen}>
         <DialogContent className="sm:max-w-[550px] max-h-[80vh] flex flex-col">
           <DialogHeader>
@@ -709,7 +684,6 @@ export function FusionMembersView() {
                     key={record.id}
                     className="p-3 bg-muted/30 rounded-lg border border-border/50 transition-all hover:bg-muted/50"
                   >
-                    {/* Modo Edição */}
                     {editingUsageId === record.id ? (
                       <div className="flex flex-col gap-3">
                         <div className="flex gap-2">
@@ -767,12 +741,11 @@ export function FusionMembersView() {
                         </div>
                       </div>
                     ) : (
-                      /* Modo Visualização Padrão */
                       <div className="flex justify-between items-start gap-4">
                         <div className="flex-1">
                           <p className="text-sm font-medium">{record.notes}</p>
                           <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                            <CalendarClock className="h-3 w-3" />
+                            <CalendarClock className="h-3 w-3" />{" "}
                             {new Date(record.usage_date).toLocaleDateString(
                               "pt-BR",
                             )}
@@ -780,8 +753,8 @@ export function FusionMembersView() {
                         </div>
                         <div className="flex flex-col items-end gap-2">
                           <Badge
-                            variant="destructive"
-                            className="bg-slate-800 font-bold"
+                            variant="secondary"
+                            className="font-bold border-muted-foreground/20 text-foreground"
                           >
                             - {record.hours_deducted}h
                           </Badge>
