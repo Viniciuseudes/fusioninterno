@@ -14,7 +14,8 @@ import { FullCalendarView } from "@/components/full-calendar-view";
 import { FindRoomView } from "@/components/find-room-view";
 import { SettingsView } from "@/components/settings-view";
 import { BlogView } from "@/components/blog-view";
-import { FusionMembersView } from "@/components/fusion-members-view"; // 👈 IMPORTAÇÃO ADICIONADA AQUI
+import { FusionMembersView } from "@/components/fusion-members-view";
+import { FotoCaixaView } from "@/components/foto-caixa-view"; // 👈 IMPORTAÇÃO DA FOTO DO CAIXA
 import { CreateTaskModal } from "@/components/create-task-modal";
 import { type Task, sampleProject, getFilteredTasks } from "@/lib/data";
 import { useUser } from "@/contexts/user-context";
@@ -186,8 +187,10 @@ export default function Home() {
         return <TeamsView />;
       case "rooms":
         return <FindRoomView />;
-      case "fusion-members": // 👈 NOVA ROTA ADICIONADA AQUI
+      case "fusion-members":
         return <FusionMembersView />;
+      case "foto-caixa": // 👈 ROTA DA FOTO DO CAIXA ADICIONADA AQUI
+        return <FotoCaixaView />;
       case "blog":
         return <BlogView />;
       case "settings":
@@ -216,7 +219,6 @@ export default function Home() {
       />
 
       <main className="flex-1 overflow-y-auto bg-background">
-        {/* 👇 AQUI ESTÁ A MÁGICA: pt-16 no mobile, md:pt-8 no desktop 👇 */}
         <div className="p-4 pt-16 md:p-8 md:pt-8 space-y-6">
           {renderContent()}
         </div>
