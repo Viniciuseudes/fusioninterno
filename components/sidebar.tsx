@@ -22,7 +22,8 @@ import {
   DoorOpen,
   BookOpen,
   LogOut,
-  UserCheck, // Ícone adicionado para os Fusion Members
+  UserCheck,
+  PieChart, // <-- Ícone importado
 } from "lucide-react";
 import { useUser } from "@/contexts/user-context";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -96,7 +97,8 @@ export function Sidebar({
     { id: "calendar", label: "Calendário", icon: Calendar },
     { id: "teams", label: "Equipes", icon: Users },
     { id: "rooms", label: "Encontre uma Sala", icon: DoorOpen },
-    { id: "fusion-members", label: "Fusion Members", icon: UserCheck }, // Nova Aba
+    { id: "foto-caixa", label: "Foto do Caixa", icon: PieChart }, // <-- Adicionado aqui
+    { id: "fusion-members", label: "Fusion Members", icon: UserCheck },
     { id: "blog", label: "Blog", icon: BookOpen },
   ];
 
@@ -193,9 +195,11 @@ export function Sidebar({
         <nav className="flex-1 px-3 py-2">
           <ul className="space-y-1">
             {navItems.map((item) => {
-              // Bloqueia o acesso ao Blog e ao Fusion Members para utilizadores comuns
+              // Bloqueia o acesso para utilizadores comuns
               if (
-                (item.id === "blog" || item.id === "fusion-members") &&
+                (item.id === "blog" ||
+                  item.id === "fusion-members" ||
+                  item.id === "foto-caixa") &&
                 !isGestorOrAdmin
               )
                 return null;
