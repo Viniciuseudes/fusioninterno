@@ -46,6 +46,7 @@ import {
   Check,
   X,
   MoreVertical,
+  RefreshCcw,
 } from "lucide-react";
 import {
   FusionMemberService,
@@ -58,7 +59,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"; // 👇 Adicione esta importação no topo
+} from "@/components/ui/dropdown-menu";
 
 export function FusionMembersView() {
   const [members, setMembers] = useState<FusionMember[]>([]);
@@ -97,6 +98,16 @@ export function FusionMembersView() {
     package_type: "10",
     start_date: new Date().toISOString().split("T")[0],
     payment_method: "Asaas",
+  });
+
+  // Novos states para a Renovação
+  const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
+  const [selectedMemberForRenewal, setSelectedMemberForRenewal] =
+    useState<FusionMember | null>(null);
+  const [renewData, setRenewData] = useState({
+    package_type: "10",
+    start_date: "",
+    end_date: "",
   });
 
   const loadMembers = async () => {
@@ -141,6 +152,47 @@ export function FusionMembersView() {
       toast({ title: "Sucesso!", description: "Assinatura cadastrada." });
       setIsAddModalOpen(false);
       setFormData({ ...formData, name: "", phone: "" });
+      loadMembers();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const openRenewModal = (member: FusionMember) => {
+    setSelectedMemberForRenewal(member);
+    const start = new Date();
+    const end = new Date();
+    end.setDate(end.getDate() + 30);
+
+    setRenewData({
+      package_type: String(member.package_type),
+      start_date: start.toISOString().split("T")[0],
+      end_date: end.toISOString().split("T")[0],
+    });
+    setIsRenewModalOpen(true);
+  };
+
+  const handleRenewMember = async () => {
+    if (!selectedMemberForRenewal) return;
+    try {
+      setIsSubmitting(true);
+      await FusionMemberService.renewMember(
+        selectedMemberForRenewal.id,
+        Number(renewData.package_type),
+        renewData.start_date,
+        renewData.end_date,
+      );
+      toast({
+        title: "Sucesso!",
+        description: "Assinatura renovada com sucesso. O saldo foi zerado.",
+      });
+      setIsRenewModalOpen(false);
       loadMembers();
     } catch (error: any) {
       toast({
@@ -287,15 +339,30 @@ export function FusionMembersView() {
     }
   };
 
-  const today = new Date("2026-03-16");
   const getMemberHealth = (member: FusionMember) => {
-    const start = new Date(member.start_date);
-    const end = new Date(member.end_date);
-    const daysElapsed = Math.floor(
-      (today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const start = new Date(member.start_date + "T00:00:00");
+    const end = new Date(member.end_date + "T00:00:00");
+
+    const daysRemaining = Math.max(
+      0,
+      Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)),
     );
-    const daysRemaining = Math.max(0, 30 - daysElapsed);
-    const timeProgress = Math.min(100, Math.max(0, (daysElapsed / 30) * 100));
+    const totalDays = Math.max(
+      1,
+      Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)),
+    );
+    const daysElapsed = Math.max(
+      0,
+      Math.ceil((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)),
+    );
+
+    const timeProgress = Math.min(
+      100,
+      Math.max(0, (daysElapsed / totalDays) * 100),
+    );
     const usageProgress = Math.min(
       100,
       (Number(member.hours_used) / member.package_type) * 100,
@@ -464,9 +531,7 @@ export function FusionMembersView() {
                         : "#10b981",
                 }}
               >
-                {/* 👇 DESIGN UI/UX: Header com Dropdown Inteligente 👇 */}
                 <CardHeader className="pb-3 pt-5 relative">
-                  {/* Botão de Menu Flutuante (3 pontinhos) para responsividade */}
                   <div className="absolute top-2 right-2">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -479,6 +544,12 @@ export function FusionMembersView() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuItem
+                          onClick={() => openRenewModal(member)}
+                          className="cursor-pointer text-green-600 focus:text-green-700"
+                        >
+                          <RefreshCcw className="mr-2 h-4 w-4" /> Renovar Ciclo
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleOpenHistory(member)}
                           className="cursor-pointer text-blue-600 focus:text-blue-700"
@@ -800,6 +871,86 @@ export function FusionMembersView() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL DE RENOVAÇÃO */}
+      <Dialog open={isRenewModalOpen} onOpenChange={setIsRenewModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Renovar Pacote</DialogTitle>
+            <DialogDescription>
+              Isso iniciará um novo ciclo para o cliente. As horas consumidas
+              serão zeradas e o novo limite começará a valer.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedMemberForRenewal && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>Cliente</Label>
+                <Input value={selectedMemberForRenewal.name} disabled />
+              </div>
+              <div className="grid gap-2">
+                <Label>Novo Pacote de Horas</Label>
+                <Select
+                  value={renewData.package_type}
+                  onValueChange={(val) =>
+                    setRenewData({ ...renewData, package_type: val })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="6">6H</SelectItem>
+                    <SelectItem value="10">10H</SelectItem>
+                    <SelectItem value="15">15H</SelectItem>
+                    <SelectItem value="20">20H</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label>Início do Novo Ciclo</Label>
+                  <Input
+                    type="date"
+                    value={renewData.start_date}
+                    onChange={(e) =>
+                      setRenewData({ ...renewData, start_date: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Fim do Ciclo</Label>
+                  <Input
+                    type="date"
+                    value={renewData.end_date}
+                    onChange={(e) =>
+                      setRenewData({ ...renewData, end_date: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsRenewModalOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleRenewMember}
+              disabled={isSubmitting}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              {isSubmitting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Confirmar Renovação
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

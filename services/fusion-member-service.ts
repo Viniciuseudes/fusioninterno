@@ -50,6 +50,23 @@ export const FusionMemberService = {
     return data;
   },
 
+  async renewMember(memberId: string, packageType: number, newStartDate: string, newEndDate: string): Promise<void> {
+    const supabase = createClient();
+    
+    const { error } = await supabase
+      .from('fusion_members')
+      .update({
+        package_type: packageType,
+        start_date: newStartDate,
+        end_date: newEndDate,
+        hours_used: 0, 
+        status: 'active'
+      })
+      .eq('id', memberId);
+
+    if (error) throw new Error(error.message);
+  },
+
   async deleteMember(id: string): Promise<void> {
     const supabase = createClient();
     const { error } = await supabase.from('fusion_members').delete().eq('id', id);
@@ -103,12 +120,9 @@ export const FusionMemberService = {
     return updatedMember;
   },
 
-  // --- NOVAS FUNÇÕES: EDITAR E EXCLUIR HISTÓRICO ---
-
   async updateUsage(usageId: string, memberId: string, oldHours: number, newHours: number, usageDate: string, notes: string): Promise<void> {
     const supabase = createClient();
     
-    // Calcula a diferença para ajustar o total do pacote
     const difference = Number(newHours) - Number(oldHours);
     
     const { data: member, error: fetchError } = await supabase
@@ -123,14 +137,12 @@ export const FusionMemberService = {
     if (newTotalHours < 0) throw new Error('O total de horas usadas não pode ser menor que zero.');
     if (newTotalHours > member.package_type) throw new Error('A alteração ultrapassa o limite do pacote.');
     
-    // Atualiza o histórico
     const { error: historyError } = await supabase
       .from('fusion_member_usage')
       .update({ hours_deducted: newHours, usage_date: usageDate, notes: notes })
       .eq('id', usageId);
     if (historyError) throw new Error(historyError.message);
     
-    // Atualiza o total do membro
     const { error: memberError } = await supabase
       .from('fusion_members')
       .update({ hours_used: newTotalHours })
@@ -149,7 +161,6 @@ export const FusionMemberService = {
       
     if (fetchError) throw new Error(fetchError.message);
     
-    // Subtrai as horas que foram deletadas do total usado (estorno)
     const newTotalHours = Math.max(0, Number(member.hours_used) - Number(hoursToRestore));
     
     const { error: historyError } = await supabase
